@@ -114,11 +114,13 @@ function scoreBadge(v) {
 function kycBadge(v) {
   if (v === "Non-KYC") return '<span class="badge kyc-non">Non-KYC</span>';
   if (v === "KYC") return '<span class="badge kyc-yes">KYC</span>';
+  if (v === "Nicht vorhanden") return '<span class="badge neutral">Nicht vorh.</span>';
   return '<span class="badge neutral">Unbekannt</span>';
 }
 function yesNoBadge(v) {
   if (v === "Ja") return '<span class="badge yes">Ja</span>';
   if (v === "Nein") return '<span class="badge neutral">Nein</span>';
+  if (v === "Nicht vorhanden") return '<span class="badge neutral">N. vorh.</span>';
   return '<span class="badge neutral">?</span>';
 }
 function statusBadge(v) {
@@ -298,11 +300,11 @@ const PROGRESS_FIELDS = [
 ];
 
 function progressOf(record) {
+  // "Nicht vorhanden" = recherchiert, aber keine echte Angabe -> zählt nicht als ausgefüllt
   let filled = 0;
-  for (const [col, kind] of PROGRESS_FIELDS) {
+  for (const [col] of PROGRESS_FIELDS) {
     const v = record[col];
-    if (kind === "unbekannt") { if (v && v !== "Unbekannt") filled++; }
-    else if (v != null && String(v).trim() !== "") filled++;
+    if (v != null && String(v).trim() !== "" && v !== "Unbekannt" && v !== "Nicht vorhanden") filled++;
   }
   return { filled, total: PROGRESS_FIELDS.length, pct: Math.round((filled / PROGRESS_FIELDS.length) * 100) };
 }
@@ -377,11 +379,12 @@ function openDrawer(record) {
       <button type="button" class="btn-secondary eig-add" id="eig-add">+ Eigenschaft hinzufügen</button>
     </div>`;
 
+  const hatFirma = record.kette_firma && record.kette_firma !== "Nicht vorhanden";
   const ketteHtml = `
     <div class="d-section">
       <h3>Kette – Schwester-Seiten</h3>
       <div id="kette-box" class="kette-list">
-        ${record.kette_firma
+        ${hatFirma
           ? '<span class="kette-hint">Lade Kette …</span>'
           : '<span class="kette-hint">Trage oben bei „Firma / Muttergesellschaft“ einen Namen ein und speichere – dann erscheinen hier alle Seiten derselben Firma.</span>'}
       </div>
@@ -396,7 +399,7 @@ function openDrawer(record) {
     wireEigDelete();
   });
   wireEigDelete();
-  if (record.kette_firma) loadKette(record);
+  if (hatFirma) loadKette(record);
 
   $("#drawer").hidden = false;
   $("#backdrop").hidden = false;
@@ -494,6 +497,7 @@ const STOP_WORDS = new Set([
   "gutem","programm","programme","programmen","angebot","angebote","angeboten","sortiert","sortiere","sortieren",
   "schnell","schnelle","schnellen","schneller","sofort","auszahlen","auszahlung","auszahlungen","auszahlt",
   "habe","hab","hast","hatte","schon","bereits","dort","denen","deren","damit","wurde","worden","sein","meine","mein","meinem","meinen",
+  "verfügbar","verfuegbar","verfügbare","verfügbaren","erlaubt","möglich","moeglich","spielen","spielbar","nutzbar",
 ]);
 
 // Angebots- und Krypto-Begriffe: suchen in Angebot/Zahlungen UND im Titel
@@ -823,6 +827,7 @@ $("#reset").addEventListener("click", () => {
 $("#prev").addEventListener("click", () => { if (state.page > 0) { state.page--; loadPage(); window.scrollTo(0, 0); } });
 $("#next").addEventListener("click", () => { state.page++; loadPage(); window.scrollTo(0, 0); });
 $("#drawer-close").addEventListener("click", closeDrawer);
+$("#drawer-close-2").addEventListener("click", closeDrawer);
 $("#backdrop").addEventListener("click", closeDrawer);
 $("#save").addEventListener("click", saveRecord);
 document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeDrawer(); });
