@@ -75,6 +75,22 @@
         </label>
         <button id="reset" class="btn-secondary" type="button">Filter zurücksetzen</button>
       </div>
+      <details id="adv" class="adv">
+        <summary>⚙️ Erweiterte Filter – alle Kategorien (Textsuche + Ausgefüllt/Leer) &amp; Account-Tracker</summary>
+        <div class="adv-tracker">
+          <label>Account-Tracker-Schritt erledigt
+            <select id="f-tracker">
+              <option value="">Egal</option>
+              <option value="account">Account erstellt</option>
+              <option value="einzahlung">Einzahlung getestet</option>
+              <option value="auszahlung">Auszahlung getestet</option>
+              <option value="affiliate_beantragt">Affiliate beantragt</option>
+              <option value="affiliate_aktiv">Affiliate aktiv</option>
+            </select>
+          </label>
+        </div>
+        <div id="adv-fields" class="adv-grid"></div>
+      </details>
     </section>
 
     <section class="results">

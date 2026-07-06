@@ -15,6 +15,8 @@ const state = {
   scoreExtra: [],    // vom Bekanntheit-Dropdown: [spalte, "op.wert"]
   wunschExtra: [],   // von der Wunsch-Suche: [spalte, "op.wert"]
   wunschGroups: [],  // von der Wunsch-Suche: PostgREST or(...)-Gruppen
+  advanced: {},      // erweiterte Filter: { spalte: { text, status } }
+  trackerStep: "",   // Account-Tracker-Filter: Schritt-Schlüssel
 };
 let currentRecord = null;
 
@@ -29,9 +31,18 @@ function buildFilterParams() {
   }
   for (const [col, cond] of [...state.scoreExtra, ...state.wunschExtra]) p.append(col, cond);
 
+  // Erweiterte Filter: Textsuche + Ausgefüllt/Leer je Kategorie
+  for (const [col, f] of Object.entries(state.advanced)) {
+    const t = (f.text || "").replace(/[,()*]/g, " ").trim();
+    if (t) p.append(col, `ilike.*${t}*`);
+    if (f.status === "ausgefuellt") p.append(col, "not.is.null");
+    if (f.status === "leer") p.append(col, "is.null");
+  }
+  if (state.trackerStep) p.append(`tracker->>${state.trackerStep}`, "eq.true");
+
   const groups = [...state.wunschGroups];
   const q = state.search.trim().replace(/[,()*]/g, " ").trim();
-  if (q) groups.push(`or(title.ilike.*${q}*,website.ilike.*${q}*,notizen.ilike.*${q}*)`);
+  if (q) groups.push(`or(title.ilike.*${q}*,website.ilike.*${q}*,notizen.ilike.*${q}*,eigenschaften_text.ilike.*${q}*)`);
   if (groups.length) p.append("and", `(${groups.join(",")})`);
   return p;
 }
@@ -188,6 +199,98 @@ const SECTIONS = [
   ]},
 ];
 
+/* ---------- Account-Tracker ---------- */
+const TRACKER_STEPS = [
+  ["account", "Account erstellt"],
+  ["einzahlung", "Einzahlung getestet"],
+  ["auszahlung", "Auszahlung getestet"],
+  ["affiliate_beantragt", "Affiliate-Programm beantragt"],
+  ["affiliate_aktiv", "Affiliate aktiv / Provision läuft"],
+];
+
+/* ---------- Erweiterte Filter: alle Kategorien ---------- */
+const ADV_FIELDS = [
+  ["website", "Website"],
+  ["kette_firma", "Kette / Firma"],
+  ["spieler_zahlen", "Spieler-Zahlen"],
+  ["kyc_details", "KYC-Details"],
+  ["zahlungsmoeglichkeiten", "Einzahlungen (Crypto)"],
+  ["allgemeines_angebot", "Allgemeines Angebot"],
+  ["sportwetten_bericht", "Sportwetten-Bericht"],
+  ["registrierung_aufwand", "Registrierungs-Aufwand"],
+  ["auszahlung_methoden", "Auszahlungsmethoden"],
+  ["auszahlung_dauer", "Auszahlungsdauer"],
+  ["kunden_bewertungen", "Kunden-Bewertungen"],
+  ["cpa_hoehe", "CPA-Höhe"],
+  ["revshare_prozent", "Revshare %"],
+  ["affiliate_auszahlung_dauer", "Affiliate-Auszahlungsdauer"],
+  ["affiliate_bewertungen", "Affiliate-Bewertungen"],
+  ["affiliate_kontakt", "Affiliate-Kontakt"],
+  ["notizen", "Notizen"],
+  ["eigenschaften_text", "Eigene Eigenschaften"],
+];
+
+function renderAdvFilters() {
+  const box = $("#adv-fields");
+  box.innerHTML = ADV_FIELDS.map(([col, label]) => `
+    <div class="adv-field">
+      <label>${esc(label)} enthält …<input type="text" data-adv-text="${col}" autocomplete="off" /></label>
+      <label>Status<select data-adv-status="${col}">
+        <option value="">Egal</option><option value="ausgefuellt">Ausgefüllt</option><option value="leer">Leer</option>
+      </select></label>
+    </div>`).join("");
+
+  let advTimer;
+  box.querySelectorAll("[data-adv-text]").forEach((inp) => {
+    inp.addEventListener("input", () => {
+      clearTimeout(advTimer);
+      advTimer = setTimeout(() => {
+        const col = inp.dataset.advText;
+        state.advanced[col] = { ...(state.advanced[col] || {}), text: inp.value };
+        state.page = 0;
+        loadPage();
+      }, 400);
+    });
+  });
+  box.querySelectorAll("[data-adv-status]").forEach((sel) => {
+    sel.addEventListener("change", () => {
+      const col = sel.dataset.advStatus;
+      state.advanced[col] = { ...(state.advanced[col] || {}), status: sel.value };
+      state.page = 0;
+      loadPage();
+    });
+  });
+}
+
+function resetAdvFilters() {
+  state.advanced = {};
+  state.trackerStep = "";
+  $("#f-tracker").value = "";
+  document.querySelectorAll("[data-adv-text]").forEach((i) => (i.value = ""));
+  document.querySelectorAll("[data-adv-status]").forEach((s) => (s.value = ""));
+}
+
+/* ---------- Recherche-Fortschritt (automatisch) ---------- */
+const PROGRESS_FIELDS = [
+  ["verfuegbar_at", "unbekannt"], ["verfuegbar_de", "unbekannt"], ["kette", "unbekannt"],
+  ["kette_firma", "text"], ["spieler_zahlen", "text"], ["kyc", "unbekannt"], ["kyc_details", "text"],
+  ["zahlungsmoeglichkeiten", "text"], ["allgemeines_angebot", "text"], ["sportwetten", "unbekannt"],
+  ["sportwetten_bericht", "text"], ["registrierung_aufwand", "text"], ["auszahlung_methoden", "text"],
+  ["auszahlung_dauer", "text"], ["kunden_bewertungen", "text"], ["affiliate", "unbekannt"],
+  ["cpa", "unbekannt"], ["cpa_hoehe", "text"], ["revshare_prozent", "text"],
+  ["affiliate_auszahlung_dauer", "text"], ["affiliate_bewertungen", "text"], ["affiliate_kontakt", "text"],
+];
+
+function progressOf(record) {
+  let filled = 0;
+  for (const [col, kind] of PROGRESS_FIELDS) {
+    const v = record[col];
+    if (kind === "unbekannt") { if (v && v !== "Unbekannt") filled++; }
+    else if (v != null && String(v).trim() !== "") filled++;
+  }
+  return { filled, total: PROGRESS_FIELDS.length, pct: Math.round((filled / PROGRESS_FIELDS.length) * 100) };
+}
+
 function fieldHtml(f, value) {
   const v = value ?? "";
   const cls = f.full ? "d-field full" : "d-field";
@@ -203,11 +306,39 @@ function fieldHtml(f, value) {
   return `<div class="${cls}">${esc(f.label)}<input type="text" data-col="${f.col}" value="${esc(v)}" /></div>`;
 }
 
+function eigRowHtml(name, wert) {
+  return `<div class="eig-row">
+    <input type="text" class="eig-name" placeholder="Eigenschaft" value="${esc(name)}" />
+    <input type="text" class="eig-wert" placeholder="Wert" value="${esc(wert)}" />
+    <button type="button" class="eig-del" title="Entfernen">✕</button>
+  </div>`;
+}
+
 function openDrawer(record) {
   if (!record) return;
   currentRecord = record;
   $("#d-title").textContent = record.title;
+  const prog = progressOf(record);
+  const tracker = record.tracker || {};
+  const eigenschaften = Array.isArray(record.eigenschaften) ? record.eigenschaften : [];
+
   const info = `
+    <div class="d-section">
+      <h3>Recherche-Fortschritt</h3>
+      <div class="progress-wrap">
+        <div class="progress-bar"><div class="progress-fill" id="prog-fill" style="width:${prog.pct}%"></div></div>
+        <div class="progress-text" id="prog-text">${prog.filled} von ${prog.total} Kategorien ausgefüllt (${prog.pct} %)</div>
+      </div>
+    </div>
+    <div class="d-section">
+      <h3>Account-Tracker</h3>
+      <div class="tracker-list">
+        ${TRACKER_STEPS.map(([key, label], i) => `
+          <label class="tracker-step"><span class="step-nr">${i + 1}.</span>
+            <input type="checkbox" data-track="${key}" ${tracker[key] ? "checked" : ""} /> ${esc(label)}
+          </label>`).join("")}
+      </div>
+    </div>
     <div class="d-section">
       <h3>Thread-Info (aus Bitcointalk)</h3>
       <div class="d-grid">
@@ -218,12 +349,77 @@ function openDrawer(record) {
         <div class="d-field full">Thread<div class="d-static"><a href="${esc(record.thread_url)}" target="_blank" rel="noopener">${esc(record.thread_url)}</a></div></div>
       </div>
     </div>`;
+
   const sections = SECTIONS.map(
     (s) => `<div class="d-section"><h3>${esc(s.title)}</h3><div class="d-grid">${s.fields.map((f) => fieldHtml(f, record[f.col])).join("")}</div></div>`
   ).join("");
-  $("#drawer-body").innerHTML = info + sections;
+
+  const eigHtml = `
+    <div class="d-section">
+      <h3>Eigene Eigenschaften</h3>
+      <div id="eig-list">${eigenschaften.map((e) => eigRowHtml(e.name || "", e.wert || "")).join("")}</div>
+      <button type="button" class="btn-secondary eig-add" id="eig-add">+ Eigenschaft hinzufügen</button>
+    </div>`;
+
+  const ketteHtml = `
+    <div class="d-section">
+      <h3>Kette – Schwester-Seiten</h3>
+      <div id="kette-box" class="kette-list">
+        ${record.kette_firma
+          ? '<span class="kette-hint">Lade Kette …</span>'
+          : '<span class="kette-hint">Trage oben bei „Firma / Muttergesellschaft“ einen Namen ein und speichere – dann erscheinen hier alle Seiten derselben Firma.</span>'}
+      </div>
+    </div>`;
+
+  $("#drawer-body").innerHTML = info + sections + eigHtml + ketteHtml;
+
+  $("#eig-add").addEventListener("click", () => {
+    $("#eig-list").insertAdjacentHTML("beforeend", eigRowHtml("", ""));
+    wireEigDelete();
+  });
+  wireEigDelete();
+  if (record.kette_firma) loadKette(record);
+
   $("#drawer").hidden = false;
   $("#backdrop").hidden = false;
+  $("#drawer-body").scrollTop = 0;
+}
+
+function wireEigDelete() {
+  document.querySelectorAll(".eig-del").forEach((btn) => {
+    btn.onclick = () => btn.closest(".eig-row").remove();
+  });
+}
+
+async function loadKette(record) {
+  const box = $("#kette-box");
+  try {
+    const name = record.kette_firma.replace(/[,()*]/g, " ").trim();
+    const p = new URLSearchParams();
+    p.append("kette_firma", `ilike.${name}`);
+    p.append("select", "*");
+    p.append("order", "bekanntheits_score.desc.nullslast");
+    p.append("limit", 50);
+    const res = await fetch(`${API}?${p}`, { headers: HEADERS });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const rows = (await res.json()).filter((r) => r.id !== record.id);
+    if (!rows.length) {
+      box.innerHTML = '<span class="kette-hint">Keine weiteren Seiten mit dieser Firma eingetragen.</span>';
+      return;
+    }
+    box.innerHTML =
+      `<span class="kette-hint">Firma „${esc(record.kette_firma)}“ – ${rows.length} weitere Seite(n):</span>` +
+      rows.map((r) => `
+        <div class="kette-item" data-kid="${r.id}">
+          <span class="k-title">${r.website ? `<b>${esc(r.website)}</b> · ` : ""}${esc(r.title)}</span>
+          <span class="badge ${r.bekanntheits_score >= 80 ? "score-high" : r.bekanntheits_score >= 50 ? "score-mid" : "score-low"}">${r.bekanntheits_score ?? "–"}</span>
+        </div>`).join("");
+    box.querySelectorAll(".kette-item").forEach((el) => {
+      el.addEventListener("click", () => openDrawer(rows.find((r) => r.id === el.dataset.kid)));
+    });
+  } catch (e) {
+    box.innerHTML = '<span class="kette-hint">Fehler beim Laden der Kette: ' + esc(e.message) + "</span>";
+  }
 }
 
 function closeDrawer() {
@@ -238,6 +434,23 @@ async function saveRecord() {
   $("#drawer-body").querySelectorAll("[data-col]").forEach((el) => {
     patch[el.dataset.col] = el.value.trim() === "" ? null : el.value.trim();
   });
+
+  // Account-Tracker einsammeln
+  const tracker = {};
+  $("#drawer-body").querySelectorAll("[data-track]").forEach((cb) => {
+    tracker[cb.dataset.track] = cb.checked;
+  });
+  patch.tracker = tracker;
+
+  // Eigene Eigenschaften einsammeln
+  const eigenschaften = [];
+  $("#drawer-body").querySelectorAll(".eig-row").forEach((row) => {
+    const name = row.querySelector(".eig-name").value.trim();
+    const wert = row.querySelector(".eig-wert").value.trim();
+    if (name) eigenschaften.push({ name, wert });
+  });
+  patch.eigenschaften = eigenschaften;
+
   patch.updated_at = new Date().toISOString();
   try {
     const res = await fetch(`${API}?id=eq.${currentRecord.id}`, {
@@ -262,6 +475,7 @@ const STOP_WORDS = new Set([
   "der","die","das","den","dem","des","und","oder","aber","mit","für","fuer","von","aus","bei","auf","in","im","am","an","zu","zum","zur","nach","als","auch","noch","nur","mal","dann","denn","doch","schon","sind","ist","sein","hat","haben","wo","was","wie","wer","es","er","sie","ich","du","wir","ihr","mir","mich","uns","man","bitte","zeig","zeige","zeigen","such","suche","suchen","finde","find","finden","gib","geben","will","wollen","möchte","moechte","hätte","haette","gerne","gern","brauche","brauch","alle","alles","allen","paar","einige","einen","eine","ein","einem","einer","eines","gute","guten","guter","gutes","beste","besten","seiten","seite","webseiten","webseite","websites","website","casinos","casino","gambling","glücksspiel","gluecksspiel","anbieter","plattform","plattformen","liste","mir","haben","gibt","sollen","soll","können","koennen","kann","welche","funktionieren","gehen","geht","laufen","sowie","dazu","etwas","irgendwas","am","liebsten","echt","richtig",
   "gutem","programm","programme","programmen","angebot","angebote","angeboten","sortiert","sortiere","sortieren",
   "schnell","schnelle","schnellen","schneller","sofort","auszahlen","auszahlung","auszahlungen","auszahlt",
+  "habe","hab","hast","hatte","schon","bereits","dort","denen","deren","damit","wurde","worden","sein","meine","mein","meinem","meinen",
 ]);
 
 // Angebots- und Krypto-Begriffe: suchen in Angebot/Zahlungen UND im Titel
@@ -345,6 +559,13 @@ function parseWunsch(raw) {
     if (tok.startsWith("aufrufe") || tok === "views" || tok.startsWith("meistgesehen")) { out.sort = "views.desc.nullslast"; out.chips.push("Sortiert nach Aufrufen"); return mark(); }
     if (tok.startsWith("antworten") || tok.startsWith("aktivste")) { out.sort = "replies.desc.nullslast"; out.chips.push("Sortiert nach Antworten"); return mark(); }
 
+    // Account-Tracker
+    if (tok === "account" || tok === "konto" || tok === "accounts") {
+      if (neg) { out.groups.push("or(tracker->>account.is.null,tracker->>account.eq.false)"); out.chips.push("Noch kein Account"); }
+      else { out.extra.push(["tracker->>account", "eq.true"]); out.chips.push("Account erstellt ✓"); }
+      return mark();
+    }
+
     // Spiel-Angebot
     const offer = OFFER_TERMS.find((o) => tok === o || tok === o + "s");
     if (offer) { out.groups.push(orGroup(offer === "würfel" ? "dice" : offer, ["allgemeines_angebot", "title"])); out.chips.push(`Angebot: ${offer}`); return mark(); }
@@ -365,7 +586,7 @@ function parseWunsch(raw) {
   tokens.forEach((tok, i) => {
     if (used.has(i) || free >= 2) return;
     if (STOP_WORDS.has(tok) || NEG_WORDS.includes(tok) || FILLER.includes(tok) || tok.length < 4) return;
-    out.groups.push(orGroup(tok, ["title", "website", "notizen"]));
+    out.groups.push(orGroup(tok, ["title", "website", "notizen", "eigenschaften_text"]));
     out.chips.push(`Text: „${tok}“`);
     free++;
   });
@@ -505,6 +726,12 @@ $("#f-score").addEventListener("change", (e) => {
 $("#wunsch-go").addEventListener("click", runWunsch);
 $("#wunsch").addEventListener("keydown", (e) => { if (e.key === "Enter") runWunsch(); });
 
+$("#f-tracker").addEventListener("change", (e) => {
+  state.trackerStep = e.target.value;
+  state.page = 0;
+  loadPage();
+});
+
 $("#reset").addEventListener("click", () => {
   state.filters = {};
   state.search = "";
@@ -512,6 +739,7 @@ $("#reset").addEventListener("click", () => {
   state.scoreExtra = [];
   state.wunschExtra = [];
   state.wunschGroups = [];
+  resetAdvFilters();
   $("#search").value = "";
   $("#wunsch").value = "";
   $("#f-score").value = "";
@@ -530,6 +758,7 @@ $("#save").addEventListener("click", saveRecord);
 document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeDrawer(); });
 
 /* ---------- Start ---------- */
+renderAdvFilters();
 setupVoice();
 loadStats();
 loadPage();
