@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex" />
+  <title>Crypto Gambling Radar</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <h1>🎰 Crypto Gambling Radar</h1>
+      <p class="subtitle">Bitcointalk Gambling-Board · alle Threads kategorisiert &amp; recherchierbar</p>
+    </div>
+  </header>
+
+  <main class="container">
+    <section class="stats" id="stats">
+      <div class="stat-card"><span class="stat-value" id="stat-total">–</span><span class="stat-label">Einträge gesamt</span></div>
+      <div class="stat-card"><span class="stat-value green" id="stat-nonkyc">–</span><span class="stat-label">Non-KYC</span></div>
+      <div class="stat-card"><span class="stat-value amber" id="stat-sport">–</span><span class="stat-label">Sportwetten</span></div>
+      <div class="stat-card"><span class="stat-value blue" id="stat-fertig">–</span><span class="stat-label">Recherche fertig</span></div>
+    </section>
+
+    <section class="controls">
+      <div class="search-row">
+        <input type="search" id="search" placeholder="🔍 Suche nach Titel, Website oder Notizen …" autocomplete="off" />
+      </div>
+      <div class="filter-row" id="filters">
+        <label>Verfügbar AT
+          <select data-col="verfuegbar_at"><option value="">Alle</option><option>Ja</option><option>Nein</option><option>Unbekannt</option></select>
+        </label>
+        <label>Verfügbar DE
+          <select data-col="verfuegbar_de"><option value="">Alle</option><option>Ja</option><option>Nein</option><option>Unbekannt</option></select>
+        </label>
+        <label>KYC
+          <select data-col="kyc"><option value="">Alle</option><option>Non-KYC</option><option>KYC</option><option>Unbekannt</option></select>
+        </label>
+        <label>Sportwetten
+          <select data-col="sportwetten"><option value="">Alle</option><option>Ja</option><option>Nein</option><option>Unbekannt</option></select>
+        </label>
+        <label>Kette
+          <select data-col="kette"><option value="">Alle</option><option>Ja</option><option>Nein</option><option>Unbekannt</option></select>
+        </label>
+        <label>Affiliate
+          <select data-col="affiliate"><option value="">Alle</option><option>Ja</option><option>Nein</option><option>Unbekannt</option></select>
+        </label>
+        <label>CPA
+          <select data-col="cpa"><option value="">Alle</option><option>Ja</option><option>Nein</option><option>Unbekannt</option></select>
+        </label>
+        <label>Recherche
+          <select data-col="recherche_status"><option value="">Alle</option><option>Offen</option><option>In Arbeit</option><option>Fertig</option></select>
+        </label>
+        <label>Sortierung
+          <select id="sort">
+            <option value="bekanntheits_score.desc.nullslast">Bekanntheit ↓</option>
+            <option value="views.desc.nullslast">Aufrufe ↓</option>
+            <option value="replies.desc.nullslast">Antworten ↓</option>
+            <option value="title.asc">Titel A–Z</option>
+            <option value="updated_at.desc">Zuletzt bearbeitet</option>
+          </select>
+        </label>
+        <button id="reset" class="btn-secondary" type="button">Filter zurücksetzen</button>
+      </div>
+    </section>
+
+    <section class="results">
+      <div class="results-meta" id="results-meta">Lade Daten …</div>
+      <div class="table-wrap">
+        <table id="table">
+          <thead>
+            <tr>
+              <th>Titel</th>
+              <th>Website</th>
+              <th>Bekanntheit</th>
+              <th>KYC</th>
+              <th>Sportwetten</th>
+              <th>Affiliate</th>
+              <th>Recherche</th>
+              <th>Aufrufe</th>
+              <th>Thread</th>
+            </tr>
+          </thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+      <div class="pagination">
+        <button id="prev" class="btn-secondary" type="button">← Zurück</button>
+        <span id="page-info"></span>
+        <button id="next" class="btn-secondary" type="button">Weiter →</button>
+      </div>
+    </section>
+  </main>
+
+  <!-- Detail-Drawer -->
+  <div class="drawer-backdrop" id="backdrop" hidden></div>
+  <aside class="drawer" id="drawer" hidden>
+    <div class="drawer-head">
+      <h2 id="d-title">Details</h2>
+      <button id="drawer-close" class="btn-icon" type="button" aria-label="Schließen">✕</button>
+    </div>
+    <div class="drawer-body" id="drawer-body"></div>
+    <div class="drawer-foot">
+      <button id="save" class="btn-primary" type="button">💾 Speichern</button>
+    </div>
+  </aside>
+
+  <div class="toast" id="toast" hidden></div>
+
+  <footer class="footer">
+    <p>Datenquelle: <a href="https://bitcointalk.org/index.php?board=56.0" target="_blank" rel="noopener">bitcointalk.org · Gambling-Board</a> · Änderungen werden live in der Datenbank gespeichert.</p>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
