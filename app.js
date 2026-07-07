@@ -1,5 +1,17 @@
 /* Crypto Gambling Radar — Frontend (Vanilla JS + Supabase REST) */
 
+// Sicherheitsnetz: Wenn irgendwo ein Skriptfehler auftritt (z.B. veraltete Version
+// im Browser-Cache), niemals stumm mit toten Buttons dastehen, sondern Hinweis zeigen.
+window.addEventListener("error", () => {
+  if (document.getElementById("reload-hint") || !document.body) return;
+  const d = document.createElement("div");
+  d.id = "reload-hint";
+  d.style.cssText = "position:fixed;top:0;left:0;right:0;z-index:9999;background:#b91c1c;color:#fff;padding:12px 16px;text-align:center;font:14px/1.4 sans-serif;";
+  d.innerHTML = '⚠ Da hat etwas nicht geklappt – vermutlich eine veraltete Version im Speicher. ' +
+    '<button onclick="location.reload()" style="margin-left:8px;padding:6px 14px;border-radius:6px;border:none;background:#fff;color:#b91c1c;font-weight:700;cursor:pointer">Jetzt neu laden</button>';
+  document.body.appendChild(d);
+});
+
 const SUPABASE_URL = "https://abeheiewozqbkylmgrqr.supabase.co";
 const SUPABASE_KEY = "sb_publishable_OysS4ElWHUiZNcC5aVdt8g__8LkRzh4";
 const TABLE = "casinos";
@@ -394,7 +406,7 @@ function openDrawer(record) {
   $("#drawer-body").innerHTML = persHtml + info + sections + eigHtml + ketteHtml;
   if (typeof window.wirePersonalSection === "function") window.wirePersonalSection(record);
 
-  $("#eig-add").addEventListener("click", () => {
+  $("#eig-add")?.addEventListener("click", () => {
     $("#eig-list").insertAdjacentHTML("beforeend", eigRowHtml("", ""));
     wireEigDelete();
   });
@@ -654,7 +666,7 @@ function renderChips(chips) {
     chips.map((c) => `<span class="chip">${esc(c)}</span>`).join("") +
     '<button class="chip-clear" id="wunsch-clear" type="button">✕ Wunsch löschen</button>';
   box.hidden = false;
-  $("#wunsch-clear").addEventListener("click", clearWunsch);
+  $("#wunsch-clear")?.addEventListener("click", clearWunsch);
 }
 
 function clearWunsch() {
@@ -739,7 +751,7 @@ function toast(msg, isError = false) {
 
 /* ---------- Events ---------- */
 let searchTimer;
-$("#search").addEventListener("input", (e) => {
+$("#search")?.addEventListener("input", (e) => {
   clearTimeout(searchTimer);
   searchTimer = setTimeout(() => {
     state.search = e.target.value;
@@ -756,13 +768,13 @@ document.querySelectorAll("#filters select[data-col]").forEach((sel) => {
   });
 });
 
-$("#sort").addEventListener("change", (e) => {
+$("#sort")?.addEventListener("change", (e) => {
   state.sort = e.target.value;
   state.page = 0;
   loadPage();
 });
 
-$("#f-score").addEventListener("change", (e) => {
+$("#f-score")?.addEventListener("change", (e) => {
   const map = {
     hoch: [["bekanntheits_score", "gte.80"]],
     mittel: [["bekanntheits_score", "gte.50"], ["bekanntheits_score", "lte.79"]],
@@ -773,16 +785,16 @@ $("#f-score").addEventListener("change", (e) => {
   loadPage();
 });
 
-$("#wunsch-go").addEventListener("click", runWunsch);
-$("#wunsch").addEventListener("keydown", (e) => { if (e.key === "Enter") runWunsch(); });
+$("#wunsch-go")?.addEventListener("click", runWunsch);
+$("#wunsch")?.addEventListener("keydown", (e) => { if (e.key === "Enter") runWunsch(); });
 
-$("#f-tracker").addEventListener("change", (e) => {
+$("#f-tracker")?.addEventListener("change", (e) => {
   state.trackerStep = e.target.value;
   state.page = 0;
   loadPage();
 });
 
-$("#f-meine").addEventListener("change", (e) => {
+$("#f-meine")?.addEventListener("change", (e) => {
   state.meineAuswahl = e.target.value;
   state.page = 0;
   loadPage();
@@ -790,7 +802,7 @@ $("#f-meine").addEventListener("change", (e) => {
 
 let revTimer;
 ["f-rev-min", "f-rev-max"].forEach((id) => {
-  document.getElementById(id).addEventListener("input", (e) => {
+  document.getElementById(id)?.addEventListener("input", (e) => {
     clearTimeout(revTimer);
     revTimer = setTimeout(() => {
       state[id === "f-rev-min" ? "revMin" : "revMax"] = e.target.value;
@@ -800,7 +812,7 @@ let revTimer;
   });
 });
 
-$("#reset").addEventListener("click", () => {
+$("#reset")?.addEventListener("click", () => {
   state.filters = {};
   state.search = "";
   state.page = 0;
@@ -824,12 +836,12 @@ $("#reset").addEventListener("click", () => {
   loadPage();
 });
 
-$("#prev").addEventListener("click", () => { if (state.page > 0) { state.page--; loadPage(); window.scrollTo(0, 0); } });
-$("#next").addEventListener("click", () => { state.page++; loadPage(); window.scrollTo(0, 0); });
-$("#drawer-close").addEventListener("click", closeDrawer);
-$("#drawer-close-2").addEventListener("click", closeDrawer);
-$("#backdrop").addEventListener("click", closeDrawer);
-$("#save").addEventListener("click", saveRecord);
+$("#prev")?.addEventListener("click", () => { if (state.page > 0) { state.page--; loadPage(); window.scrollTo(0, 0); } });
+$("#next")?.addEventListener("click", () => { state.page++; loadPage(); window.scrollTo(0, 0); });
+$("#drawer-close")?.addEventListener("click", closeDrawer);
+$("#drawer-close-2")?.addEventListener("click", closeDrawer);
+$("#backdrop")?.addEventListener("click", closeDrawer);
+$("#save")?.addEventListener("click", saveRecord);
 document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeDrawer(); });
 
 /* ---------- Start ---------- */

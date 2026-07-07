@@ -5,7 +5,22 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="robots" content="noindex" />
   <title>Crypto Gambling Radar</title>
-  <link rel="stylesheet" href="styles.css?v=20260707b" />
+  <script>
+    // Selbstheilung: prüft bei jedem Aufruf, ob eine neuere Version existiert.
+    // Falls ja (z.B. veraltetes index.html im Cache), einmalig frisch neu laden.
+    window.__APP_V = "20260707c";
+    fetch("version.txt?t=" + Date.now(), { cache: "no-store" })
+      .then((r) => r.text())
+      .then((v) => {
+        v = v.trim();
+        if (v && v !== window.__APP_V && !sessionStorage.getItem("v_" + v)) {
+          sessionStorage.setItem("v_" + v, "1");
+          location.reload();
+        }
+      })
+      .catch(() => {});
+  </script>
+  <link rel="stylesheet" href="styles.css?v=20260707c" />
 </head>
 <body>
   <!-- Passwort-Tor -->
@@ -232,7 +247,7 @@
     <p>Datenquelle: <a href="https://bitcointalk.org/index.php?board=56.0" target="_blank" rel="noopener">bitcointalk.org · Gambling-Board</a> · Änderungen werden live in der Datenbank gespeichert.</p>
   </footer>
 
-  <script src="app.js?v=20260707b"></script>
-  <script src="personal.js?v=20260707b"></script>
+  <script src="app.js?v=20260707c"></script>
+  <script src="personal.js?v=20260707c"></script>
 </body>
 </html>

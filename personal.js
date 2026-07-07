@@ -29,9 +29,10 @@ async function initGate() {
   if (localStorage.getItem("radar_pw") === hash) return initUserGate();
 
   const gate = $("#gate");
-  gate.hidden = false;
   const pwInput = $("#gate-pw");
-  $("#gate-eye").addEventListener("click", () => {
+  if (!gate || !pwInput) { window.dispatchEvent(new Event("error")); return; }
+  gate.hidden = false;
+  $("#gate-eye")?.addEventListener("click", () => {
     pwInput.type = pwInput.type === "password" ? "text" : "password";
   });
   const tryPw = async () => {
@@ -45,7 +46,7 @@ async function initGate() {
       pwInput.select();
     }
   };
-  $("#gate-go").addEventListener("click", tryPw);
+  $("#gate-go")?.addEventListener("click", tryPw);
   pwInput.addEventListener("keydown", (e) => { if (e.key === "Enter") tryPw(); });
   pwInput.focus();
 }
@@ -68,10 +69,11 @@ async function initUserGate() {
     localStorage.removeItem("radar_user");
   }
   const gate = $("#user-gate");
-  gate.hidden = false;
   const input = $("#user-name");
   const pwInput = $("#user-pw");
   const pw2Input = $("#user-pw2");
+  if (!gate || !input || !pwInput || !pw2Input) { window.dispatchEvent(new Event("error")); return; }
+  gate.hidden = false;
   let modus = "login"; // "login" | "register"
 
   const setModus = (m) => {
@@ -85,9 +87,9 @@ async function initUserGate() {
     $("#user-go").textContent = m === "login" ? "Anmelden" : "Account erstellen";
     $("#user-error").hidden = true;
   };
-  $("#tab-login").addEventListener("click", () => setModus("login"));
-  $("#tab-register").addEventListener("click", () => setModus("register"));
-  $("#user-eye").addEventListener("click", () => {
+  $("#tab-login")?.addEventListener("click", () => setModus("login"));
+  $("#tab-register")?.addEventListener("click", () => setModus("register"));
+  $("#user-eye")?.addEventListener("click", () => {
     const t = pwInput.type === "password" ? "text" : "password";
     pwInput.type = t;
     pw2Input.type = t;
@@ -128,13 +130,14 @@ async function initUserGate() {
       showUserError("Fehler: " + e.message);
     }
   };
-  $("#user-go").addEventListener("click", go);
-  [input, pwInput, pw2Input].forEach((el) => el.addEventListener("keydown", (e) => { if (e.key === "Enter") go(); }));
+  $("#user-go")?.addEventListener("click", go);
+  [input, pwInput, pw2Input].forEach((el) => el?.addEventListener("keydown", (e) => { if (e.key === "Enter") go(); }));
   input.focus();
 }
 
 function showUserError(msg) {
   const el = $("#user-error");
+  if (!el) { alert(msg); return; }
   el.textContent = msg;
   el.hidden = false;
 }
@@ -150,7 +153,7 @@ async function userReady() {
   if (!meinUser.aktiviert) $("#cookie-banner").hidden = false;
 }
 
-$("#cookie-accept").addEventListener("click", async () => {
+$("#cookie-accept")?.addEventListener("click", async () => {
   $("#cookie-banner").hidden = true;
   if (!meinUser || meinUser.aktiviert) return;
   try {
@@ -392,17 +395,17 @@ function closeMb() {
   $("#mb-backdrop").hidden = true;
 }
 
-$("#mb-open").addEventListener("click", openMb);
-$("#mb-close").addEventListener("click", closeMb);
-$("#mb-backdrop").addEventListener("click", closeMb);
-$("#mb-tabs").addEventListener("click", (e) => {
+$("#mb-open")?.addEventListener("click", openMb);
+$("#mb-close")?.addEventListener("click", closeMb);
+$("#mb-backdrop")?.addEventListener("click", closeMb);
+$("#mb-tabs")?.addEventListener("click", (e) => {
   const btn = e.target.closest(".mb-tab");
   if (!btn) return;
   mbTab = btn.dataset.tab;
   document.querySelectorAll(".mb-tab").forEach((b) => b.classList.toggle("active", b === btn));
   renderMbBody();
 });
-$("#user-switch").addEventListener("click", () => {
+$("#user-switch")?.addEventListener("click", () => {
   localStorage.removeItem("radar_user");
   location.reload();
 });
@@ -480,9 +483,9 @@ function closeAdmin() {
   $("#admin-backdrop").hidden = true;
 }
 
-$("#admin-open").addEventListener("click", openAdmin);
-$("#admin-close").addEventListener("click", closeAdmin);
-$("#admin-backdrop").addEventListener("click", closeAdmin);
+$("#admin-open")?.addEventListener("click", openAdmin);
+$("#admin-close")?.addEventListener("click", closeAdmin);
+$("#admin-backdrop")?.addEventListener("click", closeAdmin);
 
 /* ---------- Start ---------- */
 initGate();
