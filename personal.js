@@ -51,95 +51,62 @@ async function initGate() {
   pwInput.focus();
 }
 
-/* ---------- Nutzer ---------- */
+/* ---------- Nutzer: kein Login mehr – automatischer Gast-Zugang pro Gerät ---------- */
 async function initUserGate() {
+  // Admin-Freischaltung über Spezial-Link: ?admin=PASSWORT (einmalig pro Gerät)
+  const adminParam = new URLSearchParams(location.search).get("admin");
+  if (adminParam) {
+    try {
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/app_login`, {
+        method: "POST",
+        headers: { ...HEADERS, "Content-Type": "application/json" },
+        body: JSON.stringify({ p_username: "Karam", p_passwort: adminParam }),
+      });
+      const data = await res.json();
+      if (data.id && data.is_admin) {
+        localStorage.setItem("radar_user", JSON.stringify({ id: data.id, username: data.username, is_admin: true }));
+        localStorage.setItem("radar_admin_pw", adminParam);
+      }
+    } catch { /* ignorieren */ }
+    history.replaceState(null, "", location.pathname); // Passwort aus der Adresszeile entfernen
+  }
+
+  // Bestehenden Nutzer dieses Geräts wiederherstellen
   const saved = localStorage.getItem("radar_user");
   if (saved) {
     try {
       const hint = JSON.parse(saved);
-      // prüfen, ob der Nutzer noch existiert + aktuellen Aktiviert-Status holen
       const res = await fetch(`${NUTZER_API}?id=eq.${hint.id}&select=id,username,aktiviert`, { headers: HEADERS });
       const rows = await res.json();
       if (rows.length) {
         meinUser = { id: rows[0].id, username: rows[0].username, aktiviert: rows[0].aktiviert, is_admin: !!hint.is_admin };
         return userReady();
       }
-    } catch { /* neu anmelden */ }
+    } catch { /* neuen Gast anlegen */ }
     meinUser = null;
     localStorage.removeItem("radar_user");
   }
-  const gate = $("#user-gate");
-  const input = $("#user-name");
-  const pwInput = $("#user-pw");
-  const pw2Input = $("#user-pw2");
-  if (!gate || !input || !pwInput || !pw2Input) { window.dispatchEvent(new Event("error")); return; }
-  gate.hidden = false;
-  let modus = "login"; // "login" | "register"
 
-  const setModus = (m) => {
-    modus = m;
-    $("#tab-login").classList.toggle("active", m === "login");
-    $("#tab-register").classList.toggle("active", m === "register");
-    pw2Input.hidden = m === "login";
-    $("#auth-hint").textContent = m === "login"
-      ? "Melde dich mit deinem Namen und deinem Passwort an:"
-      : "Wähle einen Namen und ein eigenes Passwort (keine E-Mail nötig):";
-    $("#user-go").textContent = m === "login" ? "Anmelden" : "Account erstellen";
-    $("#user-error").hidden = true;
-  };
-  $("#tab-login")?.addEventListener("click", () => setModus("login"));
-  $("#tab-register")?.addEventListener("click", () => setModus("register"));
-  $("#user-eye")?.addEventListener("click", () => {
-    const t = pwInput.type === "password" ? "text" : "password";
-    pwInput.type = t;
-    pw2Input.type = t;
-  });
-
-  const FEHLER = {
-    name_short: "Name: bitte mindestens 2 Zeichen.",
-    pw_short: "Passwort: bitte mindestens 4 Zeichen.",
-    exists: "Dieser Name ist schon vergeben – bitte anmelden oder anderen Namen wählen.",
-    no_user: "Diesen Namen gibt es noch nicht – bitte zuerst einen Account erstellen.",
-    wrong_pw: "Falsches Passwort.",
-  };
-
-  const go = async () => {
-    const name = input.value.trim();
-    const pw = pwInput.value;
-    if (name.length < 2) { showUserError(FEHLER.name_short); return; }
-    if (pw.length < 4) { showUserError(FEHLER.pw_short); return; }
-    if (modus === "register" && pw !== pw2Input.value) { showUserError("Die Passwörter stimmen nicht überein."); return; }
+  // Automatisch einen Gast-Account für dieses Gerät anlegen (unsichtbar für den Nutzer)
+  for (let versuch = 0; versuch < 6; versuch++) {
     try {
-      const fn = modus === "register" ? "app_register" : "app_login";
-      const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/${fn}`, {
+      const name = "Gast-" + Math.floor(1000 + Math.random() * 9000);
+      const zufallsPw = [...crypto.getRandomValues(new Uint8Array(9))].map((b) => b.toString(16).padStart(2, "0")).join("");
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/app_register`, {
         method: "POST",
         headers: { ...HEADERS, "Content-Type": "application/json" },
-        body: JSON.stringify({ p_username: name, p_passwort: pw }),
+        body: JSON.stringify({ p_username: name, p_passwort: zufallsPw }),
       });
-      if (!res.ok) throw new Error("HTTP " + res.status);
       const data = await res.json();
-      if (data.error) { showUserError(FEHLER[data.error] || "Fehler: " + data.error); return; }
-
-      meinUser = { id: data.id, username: data.username, is_admin: !!data.is_admin, aktiviert: !!data.aktiviert };
-      if (meinUser.is_admin) adminPw = pw; // für das Admin-Dashboard in dieser Sitzung merken
-      // localStorage nur mit unkritischen Infos (kein Passwort)
-      localStorage.setItem("radar_user", JSON.stringify({ id: meinUser.id, username: meinUser.username, is_admin: meinUser.is_admin }));
-      gate.hidden = true;
-      userReady();
-    } catch (e) {
-      showUserError("Fehler: " + e.message);
-    }
-  };
-  $("#user-go")?.addEventListener("click", go);
-  [input, pwInput, pw2Input].forEach((el) => el?.addEventListener("keydown", (e) => { if (e.key === "Enter") go(); }));
-  input.focus();
-}
-
-function showUserError(msg) {
-  const el = $("#user-error");
-  if (!el) { alert(msg); return; }
-  el.textContent = msg;
-  el.hidden = false;
+      if (data.id) {
+        meinUser = { id: data.id, username: data.username, is_admin: false, aktiviert: false };
+        localStorage.setItem("radar_user", JSON.stringify({ id: data.id, username: data.username, is_admin: false }));
+        return userReady();
+      }
+      if (data.error !== "exists") break; // bei Namens-Kollision einfach neu würfeln
+    } catch { break; }
+  }
+  toast("Persönlicher Bereich derzeit nicht verfügbar – Ansicht funktioniert trotzdem.", true);
 }
 
 async function userReady() {
@@ -405,14 +372,11 @@ $("#mb-tabs")?.addEventListener("click", (e) => {
   document.querySelectorAll(".mb-tab").forEach((b) => b.classList.toggle("active", b === btn));
   renderMbBody();
 });
-$("#user-switch")?.addEventListener("click", () => {
-  localStorage.removeItem("radar_user");
-  location.reload();
-});
 
 /* ---------- Admin-Dashboard ---------- */
 async function openAdmin() {
   if (!meinUser?.is_admin) return;
+  adminPw = adminPw || localStorage.getItem("radar_admin_pw");
   if (!adminPw) {
     adminPw = prompt("Zur Sicherheit bitte dein Admin-Passwort eingeben:");
     if (!adminPw) return;
@@ -430,9 +394,11 @@ async function openAdmin() {
     const data = await res.json();
     if (data.error || !Array.isArray(data)) {
       adminPw = null;
+      localStorage.removeItem("radar_admin_pw");
       body.innerHTML = '<span class="admin-empty">Kein Admin-Zugriff – Passwort falsch. Bitte erneut öffnen.</span>';
       return;
     }
+    localStorage.setItem("radar_admin_pw", adminPw); // auf diesem Gerät dauerhaft freigeschaltet
     renderAdmin(data);
   } catch (e) {
     body.innerHTML = '<span class="admin-empty">Fehler beim Laden: ' + esc(e.message) + "</span>";
