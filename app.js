@@ -728,6 +728,22 @@ function clearWunsch() {
 function runWunsch() {
   const raw = $("#wunsch").value.trim();
   if (!raw) return;
+
+  // Reine Zahl (evtl. mit #) → direkt den Eintrag mit dieser Nummer zeigen
+  const nrMatch = raw.match(/^#?\s*(\d{1,6})$/);
+  if (nrMatch) {
+    state.filters = {};
+    state.wunschExtra = [];
+    state.wunschGroups = [];
+    document.querySelectorAll("#filters select[data-col]").forEach((s) => (s.value = ""));
+    state.search = nrMatch[1];
+    $("#search").value = nrMatch[1];
+    state.page = 0;
+    renderChips(["Eintrag Nr. " + nrMatch[1]]);
+    loadPage();
+    return;
+  }
+
   const parsed = parseWunsch(raw);
   if (!parsed.chips.length) { toast("Wunsch nicht verstanden – bitte anders formulieren.", true); return; }
 
