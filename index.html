@@ -9,7 +9,7 @@
     // Bulletproof-Selbstheilung: prüft bei jedem Aufruf, ob eine neuere Version existiert.
     // Falls ja, per NEUER Adresse (?fresh=...) neu laden – das umgeht garantiert den
     // Browser-Cache der alten Seite (anders als ein normales Neuladen).
-    window.__APP_V = "20260707g";
+    window.__APP_V = "20260707h";
     (function () {
       try {
         fetch("version.txt?t=" + Date.now(), { cache: "no-store" })
@@ -24,7 +24,7 @@
       } catch (e) {}
     })();
   </script>
-  <link rel="stylesheet" href="styles.css?v=20260707g" />
+  <link rel="stylesheet" href="styles.css?v=20260707h" />
 </head>
 <body>
   <!-- Passwort-Tor -->
@@ -65,6 +65,7 @@
       </div>
       <div class="user-chip" id="user-chip" hidden>
         <span id="user-chip-name"></span>
+        <button type="button" id="chat-open" class="btn-secondary">🤖 Recherche-Chat</button>
         <button type="button" id="admin-open" class="btn-secondary" hidden>🛠 Admin</button>
         <button type="button" id="mb-open" class="btn-secondary">Mein Bereich</button>
       </div>
@@ -78,6 +79,20 @@
       <button type="button" id="cookie-accept" class="btn-primary">Akzeptieren</button>
     </div>
   </div>
+
+  <!-- Recherche-Chat -->
+  <div class="drawer-backdrop" id="chat-backdrop" hidden></div>
+  <aside class="drawer chat-panel" id="chat-panel" hidden>
+    <div class="drawer-head">
+      <h2>🤖 Recherche-Chat</h2>
+      <button id="chat-close" class="btn-icon" type="button" aria-label="Schließen">✕</button>
+    </div>
+    <div class="chat-messages" id="chat-messages"></div>
+    <div class="chat-input-row">
+      <input type="text" id="chat-input" placeholder="Frag mich etwas, z.B. „Wie viele Non-KYC mit Sportwetten?“ oder „Zeig Nr. 5“ …" autocomplete="off" />
+      <button id="chat-send" class="btn-primary" type="button">Senden</button>
+    </div>
+  </aside>
 
   <!-- Admin-Dashboard -->
   <div class="drawer-backdrop" id="admin-backdrop" hidden></div>
@@ -186,6 +201,7 @@
         <table id="table">
           <thead>
             <tr>
+              <th>#</th>
               <th>Meine</th>
               <th>Titel</th>
               <th>Website</th>
@@ -202,10 +218,17 @@
         </table>
       </div>
       <div class="pagination">
+        <button id="first" class="btn-secondary" type="button" title="Erste Seite">« Anfang</button>
         <button id="prev" class="btn-secondary" type="button">← Zurück</button>
-        <span id="page-info"></span>
+        <span id="page-numbers" class="page-numbers"></span>
         <button id="next" class="btn-secondary" type="button">Weiter →</button>
+        <button id="last" class="btn-secondary" type="button" title="Letzte Seite">Ende »</button>
+        <span class="page-jump">
+          <label>Seite <input type="number" id="page-input" min="1" placeholder="Nr." /></label>
+          <button id="page-go" class="btn-secondary" type="button">Springen</button>
+        </span>
       </div>
+      <div class="page-info-line" id="page-info"></div>
     </section>
   </main>
 
@@ -229,7 +252,8 @@
     <p>Datenquelle: <a href="https://bitcointalk.org/index.php?board=56.0" target="_blank" rel="noopener">bitcointalk.org · Gambling-Board</a> · Änderungen werden live in der Datenbank gespeichert.</p>
   </footer>
 
-  <script src="app.js?v=20260707g"></script>
-  <script src="personal.js?v=20260707g"></script>
+  <script src="app.js?v=20260707h"></script>
+  <script src="personal.js?v=20260707h"></script>
+  <script src="chat.js?v=20260707h"></script>
 </body>
 </html>

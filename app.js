@@ -67,8 +67,15 @@ function buildFilterParams() {
   }
 
   const groups = [...state.wunschGroups];
-  const q = state.search.trim().replace(/[,()*]/g, " ").trim();
-  if (q) groups.push(`or(title.ilike.*${q}*,website.ilike.*${q}*,notizen.ilike.*${q}*,eigenschaften_text.ilike.*${q}*)`);
+  const qRaw = state.search.trim();
+  // Reine Zahl (evtl. mit #) → direkt nach Eintrags-Nummer suchen
+  const nrMatch = qRaw.match(/^#?\s*(\d{1,6})$/);
+  if (nrMatch) {
+    p.append("nummer", `eq.${nrMatch[1]}`);
+  } else {
+    const q = qRaw.replace(/[,()*]/g, " ").trim();
+    if (q) groups.push(`or(title.ilike.*${q}*,website.ilike.*${q}*,notizen.ilike.*${q}*,eigenschaften_text.ilike.*${q}*,kette_partner.ilike.*${q}*)`);
+  }
   if (groups.length) p.append("and", `(${groups.join(",")})`);
   return p;
 }
@@ -146,14 +153,18 @@ function statusBadge(v) {
 function renderRows(rows) {
   const tbody = $("#tbody");
   if (!rows.length) {
-    tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;color:var(--text-dim);padding:30px">Keine Treffer.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="11" style="text-align:center;color:var(--text-dim);padding:30px">Keine Treffer.</td></tr>';
     return;
   }
   tbody.innerHTML = rows
     .map(
       (r) => `<tr data-id="${r.id}">
+        <td class="nr-cell">${r.nummer != null ? "#" + r.nummer : "–"}</td>
         <td class="my-cell" onclick="event.stopPropagation()">${typeof window.myCellHtml === "function" ? window.myCellHtml(r.id) : ""}</td>
-        <td class="title-cell" title="${esc(r.title)}">${esc(r.title)}</td>
+        <td class="title-cell">
+          <div class="t-title" title="${esc(r.title)}">${esc(r.title)}</div>
+          ${r.kette_partner ? `<div class="t-kette">🔗 Verbunden mit: ${esc(r.kette_partner)}</div>` : ""}
+        </td>
         <td>${r.website ? `<span class="website">${esc(r.website)}</span>` : '<span style="color:var(--text-dim)">–</span>'}</td>
         <td>${scoreBadge(r.bekanntheits_score)}</td>
         <td>${kycBadge(r.kyc)}</td>
@@ -173,13 +184,44 @@ function renderRows(rows) {
 function renderMeta() {
   const from = state.page * PAGE_SIZE + 1;
   const to = Math.min((state.page + 1) * PAGE_SIZE, state.total);
+  const pages = Math.max(1, Math.ceil(state.total / PAGE_SIZE));
   $("#results-meta").textContent = state.total
     ? `${state.total.toLocaleString("de-AT")} Einträge · zeige ${from.toLocaleString("de-AT")}–${to.toLocaleString("de-AT")}`
     : "Keine Einträge gefunden.";
+  $("#page-info").textContent = `Seite ${(state.page + 1).toLocaleString("de-AT")} von ${pages.toLocaleString("de-AT")}`;
+  const first = state.page === 0;
+  const letzte = state.page + 1 >= pages;
+  $("#prev").disabled = first;
+  $("#first").disabled = first;
+  $("#next").disabled = letzte;
+  $("#last").disabled = letzte;
+  const pin = $("#page-input");
+  if (pin) pin.max = pages;
+  renderPageNumbers(pages);
+}
+
+function renderPageNumbers(pages) {
+  const box = $("#page-numbers");
+  if (!box) return;
+  const cur = state.page + 1;
+  const nums = [...new Set([1, 2, pages, pages - 1, cur, cur - 1, cur + 1, cur - 2, cur + 2])]
+    .filter((n) => n >= 1 && n <= pages)
+    .sort((a, b) => a - b);
+  let html = "", prev = 0;
+  for (const n of nums) {
+    if (n - prev > 1) html += '<span class="pn-gap">…</span>';
+    html += `<button class="pn-btn${n === cur ? " active" : ""}" data-page="${n}">${n.toLocaleString("de-AT")}</button>`;
+    prev = n;
+  }
+  box.innerHTML = html;
+  box.querySelectorAll(".pn-btn").forEach((b) => b.addEventListener("click", () => gotoPage(+b.dataset.page - 1)));
+}
+
+function gotoPage(pageIdx) {
   const pages = Math.max(1, Math.ceil(state.total / PAGE_SIZE));
-  $("#page-info").textContent = `Seite ${state.page + 1} von ${pages.toLocaleString("de-AT")}`;
-  $("#prev").disabled = state.page === 0;
-  $("#next").disabled = state.page + 1 >= pages;
+  state.page = Math.max(0, Math.min(pageIdx, pages - 1));
+  loadPage();
+  window.scrollTo(0, 0);
 }
 
 /* ---------- Detail-Drawer ---------- */
@@ -349,7 +391,7 @@ function eigRowHtml(name, wert) {
 function openDrawer(record) {
   if (!record) return;
   currentRecord = record;
-  $("#d-title").textContent = record.title;
+  $("#d-title").textContent = (record.nummer != null ? "#" + record.nummer + " · " : "") + record.title;
   const prog = progressOf(record);
   const tracker = record.tracker || {};
   const eigenschaften = Array.isArray(record.eigenschaften) ? record.eigenschaften : [];
@@ -512,6 +554,7 @@ const STOP_WORDS = new Set([
   "schnell","schnelle","schnellen","schneller","sofort","auszahlen","auszahlung","auszahlungen","auszahlt",
   "habe","hab","hast","hatte","schon","bereits","dort","denen","deren","damit","wurde","worden","sein","meine","mein","meinem","meinen",
   "verfügbar","verfuegbar","verfügbare","verfügbaren","erlaubt","möglich","moeglich","spielen","spielbar","nutzbar",
+  "viele","vielen","wieviele","gibt","gibts","zeig","zeige","zeigen","welche","welches","welcher","anzahl","liste","alle",
 ]);
 
 // Angebots- und Krypto-Begriffe: suchen in Angebot/Zahlungen UND im Titel
@@ -838,8 +881,13 @@ $("#reset")?.addEventListener("click", () => {
   loadPage();
 });
 
-$("#prev")?.addEventListener("click", () => { if (state.page > 0) { state.page--; loadPage(); window.scrollTo(0, 0); } });
-$("#next")?.addEventListener("click", () => { state.page++; loadPage(); window.scrollTo(0, 0); });
+$("#prev")?.addEventListener("click", () => gotoPage(state.page - 1));
+$("#next")?.addEventListener("click", () => gotoPage(state.page + 1));
+$("#first")?.addEventListener("click", () => gotoPage(0));
+$("#last")?.addEventListener("click", () => gotoPage(Math.ceil(state.total / PAGE_SIZE) - 1));
+const springen = () => { const v = parseInt($("#page-input").value, 10); if (v >= 1) gotoPage(v - 1); };
+$("#page-go")?.addEventListener("click", springen);
+$("#page-input")?.addEventListener("keydown", (e) => { if (e.key === "Enter") springen(); });
 $("#drawer-close")?.addEventListener("click", closeDrawer);
 $("#drawer-close-2")?.addEventListener("click", closeDrawer);
 $("#backdrop")?.addEventListener("click", closeDrawer);
