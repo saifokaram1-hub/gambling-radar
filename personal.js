@@ -380,6 +380,43 @@ function closeMb() {
   $("#mb-backdrop").hidden = true;
 }
 
+/* Excel-Export des aktiven Mein-Bereich-Tabs (inkl. Ordner + private Notizen) */
+async function mbFetchByIds(ids) {
+  const rows = [];
+  const cols = EXPORT_SPALTEN.map(([c]) => c).join(",");
+  for (let i = 0; i < ids.length; i += 200) {
+    const chunk = ids.slice(i, i + 200);
+    const res = await fetch(`${API}?id=in.(${chunk.join(",")})&select=id,${cols}&order=bekanntheits_score.desc.nullslast`, { headers: HEADERS });
+    if (res.ok) rows.push(...(await res.json()));
+  }
+  return rows;
+}
+
+$("#mb-export")?.addEventListener("click", async () => {
+  toast("Export läuft …");
+  try {
+    let rows = [];
+    let spalten = [...EXPORT_SPALTEN, ["meine_notiz", "Meine private Notiz"]];
+    if (mbTab === "ordner") {
+      spalten = [["ordner_name", "Ordner"], ...spalten];
+      for (const f of myFolders) {
+        const teil = await mbFetchByIds([...(folderItems.get(f.id) || [])]);
+        teil.forEach((r) => rows.push({ ...r, ordner_name: f.name }));
+      }
+    } else {
+      rows = await mbFetchByIds(window.meineAuswahlIds(mbTab === "notizen" ? "notiz" : mbTab));
+    }
+    if (!rows.length) { toast("In diesem Tab ist nichts zu exportieren.", true); return; }
+    rows.forEach((r) => { r.meine_notiz = myItems.get(r.id)?.notiz || ""; });
+
+    const escCsv = (v) => { const s = v == null ? "" : String(v); return /[";\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
+    const csv = "﻿" + [spalten.map(([, l]) => l).join(";"),
+      ...rows.map((r) => spalten.map(([c]) => escCsv(r[c])).join(";"))].join("\r\n");
+    downloadDatei(`mein-bereich-${mbTab}-${rows.length}-eintraege.csv`, csv, "text/csv;charset=utf-8");
+    toast(`✓ Excel-Datei mit ${rows.length} Einträgen heruntergeladen!`);
+  } catch (e) { toast("Export-Fehler: " + e.message, true); }
+});
+
 $("#mb-open")?.addEventListener("click", openMb);
 $("#mb-close")?.addEventListener("click", closeMb);
 $("#mb-backdrop")?.addEventListener("click", closeMb);

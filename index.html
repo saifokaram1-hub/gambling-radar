@@ -9,7 +9,7 @@
     // Bulletproof-Selbstheilung: prüft bei jedem Aufruf, ob eine neuere Version existiert.
     // Falls ja, per NEUER Adresse (?fresh=...) neu laden – das umgeht garantiert den
     // Browser-Cache der alten Seite (anders als ein normales Neuladen).
-    window.__APP_V = "20260707i";
+    window.__APP_V = "20260707j";
     (function () {
       try {
         fetch("version.txt?t=" + Date.now(), { cache: "no-store" })
@@ -24,7 +24,7 @@
       } catch (e) {}
     })();
   </script>
-  <link rel="stylesheet" href="styles.css?v=20260707i" />
+  <link rel="stylesheet" href="styles.css?v=20260707j" />
 </head>
 <body>
   <!-- Passwort-Tor -->
@@ -46,6 +46,7 @@
   <aside class="drawer" id="mb-panel" hidden>
     <div class="drawer-head">
       <h2 id="mb-title">👤 Mein Bereich</h2>
+      <button id="mb-export" class="btn-secondary" type="button" title="Diese Liste als Excel-Datei herunterladen">⬇ Excel</button>
       <button id="mb-close" class="btn-icon" type="button" aria-label="Schließen">✕</button>
     </div>
     <div class="mb-tabs" id="mb-tabs">
@@ -109,7 +110,7 @@
       <div class="stat-card"><span class="stat-value" id="stat-total">–</span><span class="stat-label">Einträge gesamt</span></div>
       <div class="stat-card"><span class="stat-value green" id="stat-nonkyc">–</span><span class="stat-label">Non-KYC</span></div>
       <div class="stat-card"><span class="stat-value amber" id="stat-sport">–</span><span class="stat-label">Sportwetten</span></div>
-      <div class="stat-card"><span class="stat-value blue" id="stat-fertig">–</span><span class="stat-label">Recherche fertig</span></div>
+      <div class="stat-card"><span class="stat-value blue" id="stat-fertig">–</span><span class="stat-label">In DE verfügbar</span></div>
     </section>
 
     <section class="controls wunsch-box">
@@ -126,11 +127,29 @@
         <input type="search" id="search" placeholder="🔍 Schnellsuche: Titel, Website oder Notizen …" autocomplete="off" />
       </div>
       <div class="filter-row" id="filters">
+        <label>Verfügbar DE/AT
+          <select id="f-dach">
+            <option value="">Alle</option>
+            <option value="oder">DE oder AT verfügbar</option>
+            <option value="und">DE und AT verfügbar</option>
+            <option value="de">Nur DE verfügbar</option>
+            <option value="at">Nur AT verfügbar</option>
+            <option value="keins">Nirgends verfügbar</option>
+          </select>
+        </label>
+        <label>Standort
+          <select id="f-standort">
+            <option value="">Alle</option>
+            <option value="de">Deutschland</option>
+            <option value="at">Österreich</option>
+            <option value="int">International</option>
+          </select>
+        </label>
         <label>Verfügbar AT
-          <select data-col="verfuegbar_at"><option value="">Alle</option><option>Ja</option><option>Nein</option><option>Unbekannt</option><option>Nicht vorhanden</option></select>
+          <select data-col="verfuegbar_at"><option value="">Alle</option><option>Ja</option><option>Nein</option></select>
         </label>
         <label>Verfügbar DE
-          <select data-col="verfuegbar_de"><option value="">Alle</option><option>Ja</option><option>Nein</option><option>Unbekannt</option><option>Nicht vorhanden</option></select>
+          <select data-col="verfuegbar_de"><option value="">Alle</option><option>Ja</option><option>Nein</option></select>
         </label>
         <label>KYC
           <select data-col="kyc"><option value="">Alle</option><option>Non-KYC</option><option>KYC</option><option>Unbekannt</option><option>Nicht vorhanden</option></select>
@@ -196,7 +215,13 @@
     </section>
 
     <section class="results">
-      <div class="results-meta" id="results-meta">Lade Daten …</div>
+      <div class="results-head">
+        <div class="results-meta" id="results-meta">Lade Daten …</div>
+        <div class="export-row">
+          <button id="export-csv" class="btn-secondary" type="button" title="Aktuelle Filter-Ergebnisse als Excel-Datei herunterladen">⬇ Excel</button>
+          <button id="export-pdf" class="btn-secondary" type="button" title="Aktuelle Filter-Ergebnisse als PDF-Bericht herunterladen">⬇ PDF</button>
+        </div>
+      </div>
       <div class="table-wrap">
         <table id="table">
           <thead>
@@ -252,8 +277,8 @@
     <p>Datenquelle: <a href="https://bitcointalk.org/index.php?board=56.0" target="_blank" rel="noopener">bitcointalk.org · Gambling-Board</a> · Änderungen werden live in der Datenbank gespeichert.</p>
   </footer>
 
-  <script src="app.js?v=20260707i"></script>
-  <script src="personal.js?v=20260707i"></script>
-  <script src="chat.js?v=20260707i"></script>
+  <script src="app.js?v=20260707j"></script>
+  <script src="personal.js?v=20260707j"></script>
+  <script src="chat.js?v=20260707j"></script>
 </body>
 </html>

@@ -242,6 +242,8 @@ a { color: var(--accent); }
 .kette-hint { color: var(--text-dim); font-size: 0.8rem; }
 
 /* Table */
+.results-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
+.export-row { display: flex; gap: 8px; }
 .results-meta { color: var(--text-dim); font-size: 0.88rem; margin: 8px 2px; }
 .table-wrap {
   overflow-x: auto;

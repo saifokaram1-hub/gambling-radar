@@ -34,6 +34,8 @@ const state = {
   revMin: "",        // Revshare-%-Filter ab
   revMax: "",        // Revshare-%-Filter bis
   meineAuswahl: "",  // persönlicher Filter: liked/gespeichert/notiz/ordner:<id>
+  dach: "",          // DE/AT-Verfügbarkeit kombiniert: oder/und/de/at/keins
+  standortFilter: "", // Firmen-Standort: de/at/int
 };
 let currentRecord = null;
 
@@ -60,6 +62,17 @@ function buildFilterParams() {
   if (state.revMin !== null && state.revMin !== "") p.append("revshare_wert", `gte.${state.revMin}`);
   if (state.revMax !== null && state.revMax !== "") p.append("revshare_wert", `lte.${state.revMax}`);
 
+  // Kombinierte DE/AT-Verfügbarkeit
+  if (state.dach === "und") { p.append("verfuegbar_de", "eq.Ja"); p.append("verfuegbar_at", "eq.Ja"); }
+  if (state.dach === "de") p.append("verfuegbar_de", "eq.Ja");
+  if (state.dach === "at") p.append("verfuegbar_at", "eq.Ja");
+  if (state.dach === "keins") { p.append("verfuegbar_de", "eq.Nein"); p.append("verfuegbar_at", "eq.Nein"); }
+
+  // Firmen-Standort
+  if (state.standortFilter === "de") p.append("standort", "ilike.Deutschland*");
+  if (state.standortFilter === "at") p.append("standort", "ilike.Österreich*");
+  if (state.standortFilter === "int") p.append("standort", "eq.International");
+
   // Persönlicher Filter (Geliked/Gespeichert/Notiz/Ordner) – IDs kommen aus personal.js
   if (state.meineAuswahl && typeof window.meineAuswahlIds === "function") {
     const ids = window.meineAuswahlIds(state.meineAuswahl);
@@ -67,11 +80,26 @@ function buildFilterParams() {
   }
 
   const groups = [...state.wunschGroups];
+  if (state.dach === "oder") groups.push("or(verfuegbar_de.eq.Ja,verfuegbar_at.eq.Ja)");
+
   const qRaw = state.search.trim();
   // Reine Zahl (evtl. mit #) → direkt nach Eintrags-Nummer suchen
   const nrMatch = qRaw.match(/^#?\s*(\d{1,6})$/);
+  const qLower = qRaw.toLowerCase();
   if (nrMatch) {
     p.append("nummer", `eq.${nrMatch[1]}`);
+  } else if (/^(non[\s-]?kyc|no[\s-]?kyc|ohne kyc|kein kyc)$/.test(qLower)) {
+    // Schlaue Suche: "non-kyc" tippen = Non-KYC-Filter
+    p.append("kyc", "eq.Non-KYC");
+  } else if (/^(kyc|mit kyc)$/.test(qLower)) {
+    // "kyc" tippen = KYC-Filter (alle mit Verifizierungspflicht), nicht Titeltext
+    p.append("kyc", "eq.KYC");
+  } else if (/^(cpa)$/.test(qLower)) {
+    p.append("cpa", "eq.Ja");
+  } else if (/^(affiliate)$/.test(qLower)) {
+    p.append("affiliate", "eq.Ja");
+  } else if (/^(sportwetten|sport)$/.test(qLower)) {
+    p.append("sportwetten", "eq.Ja");
   } else {
     const q = qRaw.replace(/[,()*]/g, " ").trim();
     if (q) groups.push(`or(title.ilike.*${q}*,website.ilike.*${q}*,notizen.ilike.*${q}*,eigenschaften_text.ilike.*${q}*,kette_partner.ilike.*${q}*)`);
@@ -117,7 +145,7 @@ async function loadStats() {
       countWhere(new URLSearchParams()),
       countWhere(new URLSearchParams({ kyc: "eq.Non-KYC" })),
       countWhere(new URLSearchParams({ sportwetten: "eq.Ja" })),
-      countWhere(new URLSearchParams({ recherche_status: "eq.Fertig" })),
+      countWhere(new URLSearchParams({ verfuegbar_de: "eq.Ja" })),
     ]);
     $("#stat-total").textContent = total.toLocaleString("de-AT");
     $("#stat-nonkyc").textContent = nonkyc.toLocaleString("de-AT");
@@ -555,6 +583,7 @@ const STOP_WORDS = new Set([
   "habe","hab","hast","hatte","schon","bereits","dort","denen","deren","damit","wurde","worden","sein","meine","mein","meinem","meinen",
   "verfügbar","verfuegbar","verfügbare","verfügbaren","erlaubt","möglich","moeglich","spielen","spielbar","nutzbar",
   "viele","vielen","wieviele","gibt","gibts","zeig","zeige","zeigen","welche","welches","welcher","anzahl","liste","alle",
+  "firma","firmen","unternehmen","stationiert","standort","standorte","sitz","ansässig","ansaessig","gegründet","gegruendet","erstellt",
 ]);
 
 // Angebots- und Krypto-Begriffe: suchen in Angebot/Zahlungen UND im Titel
@@ -583,6 +612,32 @@ function parseWunsch(raw) {
     out.chips.push("Schnelle Auszahlung");
   }
 
+  // Standort-Phrasen: "in Deutschland stationiert/ansässig", "Sitz in Österreich", "deutsche Firma"
+  let landAlsStandort = false;
+  if (/stationiert|standort|sitz\b|ansässig|gegründet|deutsche firma|firmensitz/.test(text)) {
+    if (/deutschland|germany|deutsche/.test(text)) {
+      out.extra.push(["standort", "ilike.Deutschland*"]);
+      out.chips.push("Standort: Deutschland");
+      landAlsStandort = true;
+    }
+    if (/österreich|oesterreich|austria/.test(text)) {
+      out.extra.push(["standort", "ilike.Österreich*"]);
+      out.chips.push("Standort: Österreich");
+      landAlsStandort = true;
+    }
+  }
+  // Kombinierte Verfügbarkeit: "in beiden verfügbar", "DE und AT", "eins von beiden"
+  if (/beide[nm]? (länder[n]?\s*)?(verfügbar|erlaubt)|de und at|deutschland und österreich/.test(text) && !landAlsStandort) {
+    out.filters.verfuegbar_de = "Ja";
+    out.filters.verfuegbar_at = "Ja";
+    out.chips.push("Verfügbar DE UND AT");
+    landAlsStandort = true;
+  } else if (/eins? von beiden|de oder at|deutschland oder österreich/.test(text) && !landAlsStandort) {
+    out.groups.push("or(verfuegbar_de.eq.Ja,verfuegbar_at.eq.Ja)");
+    out.chips.push("Verfügbar DE ODER AT");
+    landAlsStandort = true;
+  }
+
   // Revshare-Prozent-Bereiche ("revshare ab 25%", "unter 40%")
   let revPhrase = false;
   if (/rev[\s-]?share|revenue|provision|kommission/.test(text)) {
@@ -607,12 +662,14 @@ function parseWunsch(raw) {
       out.filters.sportwetten = jn(neg); out.chips.push(`Sportwetten: ${jn(neg)}`); return mark();
     }
 
-    // Verfügbarkeit
+    // Verfügbarkeit (übersprungen, wenn das Land schon als Standort/Kombi verstanden wurde)
     if (tok.startsWith("österreich") || tok.startsWith("oesterreich") || tok === "austria" || tok.startsWith("österreicher")) {
-      out.filters.verfuegbar_at = jn(neg); out.chips.push(`Verfügbar AT: ${jn(neg)}`); return mark();
+      if (!landAlsStandort) { out.filters.verfuegbar_at = jn(neg); out.chips.push(`Verfügbar AT: ${jn(neg)}`); }
+      return mark();
     }
     if (tok.startsWith("deutschland") || tok === "germany" || tok.startsWith("deutsche")) {
-      out.filters.verfuegbar_de = jn(neg); out.chips.push(`Verfügbar DE: ${jn(neg)}`); return mark();
+      if (!landAlsStandort) { out.filters.verfuegbar_de = jn(neg); out.chips.push(`Verfügbar DE: ${jn(neg)}`); }
+      return mark();
     }
 
     // Kette
@@ -861,6 +918,18 @@ $("#f-meine")?.addEventListener("change", (e) => {
   loadPage();
 });
 
+$("#f-dach")?.addEventListener("change", (e) => {
+  state.dach = e.target.value;
+  state.page = 0;
+  loadPage();
+});
+
+$("#f-standort")?.addEventListener("change", (e) => {
+  state.standortFilter = e.target.value;
+  state.page = 0;
+  loadPage();
+});
+
 let revTimer;
 ["f-rev-min", "f-rev-max"].forEach((id) => {
   document.getElementById(id)?.addEventListener("input", (e) => {
@@ -883,6 +952,8 @@ $("#reset")?.addEventListener("click", () => {
   state.revMin = "";
   state.revMax = "";
   state.meineAuswahl = "";
+  state.dach = "";
+  state.standortFilter = "";
   resetAdvFilters();
   $("#search").value = "";
   $("#wunsch").value = "";
@@ -890,6 +961,8 @@ $("#reset")?.addEventListener("click", () => {
   $("#f-rev-min").value = "";
   $("#f-rev-max").value = "";
   $("#f-meine").value = "";
+  $("#f-dach").value = "";
+  $("#f-standort").value = "";
   renderChips([]);
   document.querySelectorAll("#filters select[data-col]").forEach((s) => (s.value = ""));
   $("#sort").value = "bekanntheits_score.desc.nullslast";
@@ -909,6 +982,100 @@ $("#drawer-close-2")?.addEventListener("click", closeDrawer);
 $("#backdrop")?.addEventListener("click", closeDrawer);
 $("#save")?.addEventListener("click", saveRecord);
 document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeDrawer(); });
+
+/* ---------- Export: Excel (CSV) & PDF-Bericht ---------- */
+const EXPORT_SPALTEN = [
+  ["nummer", "Nr"], ["title", "Titel"], ["website", "Website"], ["website_status", "Website-Status"],
+  ["bekanntheits_score", "Bekanntheit"], ["kyc", "KYC"], ["kyc_details", "KYC-Details"],
+  ["verfuegbar_de", "Verfügbar DE"], ["verfuegbar_at", "Verfügbar AT"], ["standort", "Standort"],
+  ["sportwetten", "Sportwetten"], ["sportwetten_bericht", "Sportwetten-Bericht"],
+  ["allgemeines_angebot", "Angebot"], ["zahlungsmoeglichkeiten", "Einzahlung"],
+  ["auszahlung_methoden", "Auszahlung"], ["auszahlung_dauer", "Auszahlungsdauer"],
+  ["registrierung_aufwand", "Registrierung"], ["lizenz", "Lizenz"],
+  ["kette", "Kette"], ["kette_firma", "Firma"], ["kette_partner", "Verbundene Seiten"],
+  ["affiliate", "Affiliate"], ["cpa", "CPA"], ["cpa_hoehe", "CPA-Höhe"], ["revshare_prozent", "Revshare"],
+  ["affiliate_kontakt", "Affiliate-Kontakt"], ["spieler_zahlen", "Spielerzahlen"],
+  ["kunden_bewertungen", "Bewertungen"], ["views", "Aufrufe"], ["thread_url", "Bitcointalk-Link"],
+];
+
+async function exportRowsFetch(maxRows = 12000) {
+  const alle = [];
+  for (let off = 0; off < maxRows; off += 1000) {
+    const p = buildFilterParams();
+    p.append("select", EXPORT_SPALTEN.map(([c]) => c).join(","));
+    p.append("order", state.sort);
+    p.append("limit", 1000);
+    p.append("offset", off);
+    const res = await fetch(`${API}?${p}`, { headers: HEADERS });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const batch = await res.json();
+    alle.push(...batch);
+    if (batch.length < 1000) break;
+  }
+  return alle;
+}
+
+function downloadDatei(name, inhalt, typ) {
+  const blob = new Blob([inhalt], { type: typ });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = name;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+}
+
+function rowsAlsCsv(rows) {
+  const escCsv = (v) => {
+    const s = v == null ? "" : String(v);
+    return /[";\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+  };
+  const kopf = EXPORT_SPALTEN.map(([, l]) => l).join(";");
+  const zeilen = rows.map((r) => EXPORT_SPALTEN.map(([c]) => escCsv(r[c])).join(";"));
+  return "﻿" + [kopf, ...zeilen].join("\r\n");
+}
+
+async function exportCsv() {
+  toast("Export läuft – einen Moment …");
+  try {
+    const rows = await exportRowsFetch();
+    downloadDatei(`gambling-radar-bericht-${rows.length}-eintraege.csv`, rowsAlsCsv(rows), "text/csv;charset=utf-8");
+    toast(`✓ Excel-Datei mit ${rows.length.toLocaleString("de-AT")} Einträgen heruntergeladen!`);
+  } catch (e) { toast("Export-Fehler: " + e.message, true); }
+}
+
+async function exportPdf() {
+  toast("PDF-Bericht wird erstellt …");
+  try {
+    const rows = await exportRowsFetch(2000);
+    const zeilen = rows.map((r) => `<tr>
+      <td>#${r.nummer}</td><td>${esc(r.website || "–")}</td><td>${esc((r.title || "").slice(0, 60))}</td>
+      <td>${r.bekanntheits_score ?? "–"}</td><td>${esc(r.kyc)}</td><td>${esc(r.sportwetten)}</td>
+      <td>${esc(r.verfuegbar_de)}</td><td>${esc(r.verfuegbar_at)}</td><td>${esc(r.affiliate)}</td>
+      <td>${esc(r.revshare_prozent || "–")}</td><td>${esc(r.lizenz || "–")}</td>
+    </tr>`).join("");
+    const w = window.open("", "_blank");
+    w.document.write(`<!DOCTYPE html><html lang="de"><head><meta charset="utf-8"><title>Gambling-Radar Bericht</title>
+      <style>
+        body { font-family: Arial, sans-serif; font-size: 10px; margin: 20px; }
+        h1 { font-size: 16px; } .meta { color: #555; margin-bottom: 12px; }
+        table { border-collapse: collapse; width: 100%; }
+        th, td { border: 1px solid #999; padding: 3px 5px; text-align: left; }
+        th { background: #eee; } tr:nth-child(even) { background: #f7f7f7; }
+        @media print { body { margin: 8mm; } }
+      </style></head><body>
+      <h1>🎰 Crypto Gambling Radar – Bericht</h1>
+      <div class="meta">Erstellt am ${new Date().toLocaleString("de-AT")} · ${rows.length.toLocaleString("de-AT")} Einträge (aktuelle Filter)${rows.length === 2000 ? " · auf 2.000 begrenzt – für alles bitte Excel-Export nutzen" : ""}</div>
+      <table><thead><tr><th>Nr</th><th>Website</th><th>Titel</th><th>Bek.</th><th>KYC</th><th>Sport</th><th>DE</th><th>AT</th><th>Affiliate</th><th>Revshare</th><th>Lizenz</th></tr></thead>
+      <tbody>${zeilen}</tbody></table>
+      <script>window.onload = () => setTimeout(() => window.print(), 400);<\/script>
+      </body></html>`);
+    w.document.close();
+    toast("✓ PDF-Bericht geöffnet – im Druck-Dialog „Als PDF speichern“ wählen.");
+  } catch (e) { toast("Export-Fehler: " + e.message, true); }
+}
+
+$("#export-csv")?.addEventListener("click", exportCsv);
+$("#export-pdf")?.addEventListener("click", exportPdf);
 
 /* ---------- Start ---------- */
 renderAdvFilters();
