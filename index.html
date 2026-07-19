@@ -9,7 +9,7 @@
     // Bulletproof-Selbstheilung: prüft bei jedem Aufruf, ob eine neuere Version existiert.
     // Falls ja, per NEUER Adresse (?fresh=...) neu laden – das umgeht garantiert den
     // Browser-Cache der alten Seite (anders als ein normales Neuladen).
-    window.__APP_V = "20260707k";
+    window.__APP_V = "20260707l";
     (function () {
       try {
         fetch("version.txt?t=" + Date.now(), { cache: "no-store" })
@@ -24,7 +24,7 @@
       } catch (e) {}
     })();
   </script>
-  <link rel="stylesheet" href="styles.css?v=20260707k" />
+  <link rel="stylesheet" href="styles.css?v=20260707l" />
 </head>
 <body>
   <!-- Passwort-Tor -->
@@ -181,6 +181,20 @@
         <label>CPA bis $
           <input type="number" id="f-cpa-max" min="0" step="10" placeholder="z.B. 500" />
         </label>
+        <label>Bewertung ab
+          <select id="f-bew-min">
+            <option value="">Alle</option>
+            <option value="9">≥ 9 (Top)</option>
+            <option value="8">≥ 8</option>
+            <option value="7">≥ 7 (gut)</option>
+            <option value="6">≥ 6</option>
+            <option value="5">≥ 5</option>
+            <option value="4">≥ 4</option>
+          </select>
+        </label>
+        <label>Nur bewertete
+          <select id="f-bew-only"><option value="">Alle</option><option value="ja">Nur mit Bewertung</option></select>
+        </label>
         <label>Recherche
           <select data-col="recherche_status"><option value="">Alle</option><option>Offen</option><option>In Arbeit</option><option>Fertig</option></select>
         </label>
@@ -197,6 +211,8 @@
             <option value="replies.desc.nullslast">Antworten ↓</option>
             <option value="title.asc">Titel A–Z</option>
             <option value="revshare_wert.desc.nullslast">Revshare % ↓</option>
+            <option value="bewertung_gesamt.desc.nullslast">Bewertung ↓</option>
+            <option value="bewertung_kommentare.desc.nullslast">Kommentare ↓</option>
             <option value="updated_at.desc">Zuletzt bearbeitet</option>
           </select>
         </label>
@@ -243,6 +259,7 @@
               <th>Affiliate</th>
               <th>Revshare</th>
               <th>CPA</th>
+              <th>Bewertung</th>
               <th>Aufrufe</th>
               <th>Thread</th>
             </tr>
@@ -285,8 +302,8 @@
     <p>Datenquelle: <a href="https://bitcointalk.org/index.php?board=56.0" target="_blank" rel="noopener">bitcointalk.org · Gambling-Board</a> · Änderungen werden live in der Datenbank gespeichert.</p>
   </footer>
 
-  <script src="app.js?v=20260707k"></script>
-  <script src="personal.js?v=20260707k"></script>
-  <script src="chat.js?v=20260707k"></script>
+  <script src="app.js?v=20260707l"></script>
+  <script src="personal.js?v=20260707l"></script>
+  <script src="chat.js?v=20260707l"></script>
 </body>
 </html>

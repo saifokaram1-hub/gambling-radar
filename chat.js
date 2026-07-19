@@ -32,6 +32,7 @@ function chatEntryHtml(r) {
   else if (r.affiliate === "Ja") infos.push("Affiliate (Satz verhandeln)");
   if (r.cpa_wert != null) infos.push(`CPA $${r.cpa_wert}`);
   else if (r.cpa === "Ja") infos.push("CPA möglich");
+  if (r.bewertung_gesamt != null) infos.push(`★ ${r.bewertung_gesamt}/10 (${r.bewertung_kommentare || "?"}💬)`);
   return `<span class="chat-entry" data-id="${r.id}">#${r.nummer} · ${site}${esc((r.title || "").slice(0, 60))}<br><span style="color:var(--text-dim);font-size:0.78rem">${infos.join(" · ")}</span></span>`;
 }
 
@@ -97,6 +98,18 @@ async function chatAnswer(frage) {
     const anzahl = await chatCount(new URLSearchParams({ kette: "eq.Ja" }));
     const bsp = await chatExamples(new URLSearchParams({ kette: "eq.Ja" }));
     return chatAdd("bot", `<b>${anzahl}</b> Einträge gehören zu einer Kette (mehrere Seiten derselben Firma). Beispiele – klick für die verbundenen Seiten:<br>` +
+      bsp.map(chatEntryHtml).join("<br>"));
+  }
+
+  // 3b) Bewertungs-Frage
+  if (/bewert|beste[ns]?\b|gut(e|en)?\b|top[\s-]?casino|empfehl|schlecht|rating|sterne/.test(lower)) {
+    const abM = lower.match(/(?:ab|über|ueber|mindestens|mehr als)\s*(\d{1,2})/);
+    const ab = abM ? abM[1] : "7";
+    const params = new URLSearchParams();
+    params.append("bewertung_gesamt", `gte.${ab}`);
+    const anzahl = await chatCount(params);
+    const bsp = await chatExamples(params, "bewertung_gesamt.desc.nullslast");
+    return chatAdd("bot", `<b>${anzahl.toLocaleString("de-AT")}</b> Casinos haben eine Community-Bewertung von <b>${ab}/10 oder besser</b> (aus den Thread-Kommentaren). Die bestbewerteten:<br>` +
       bsp.map(chatEntryHtml).join("<br>"));
   }
 

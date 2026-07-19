@@ -38,6 +38,8 @@ const state = {
   standortFilter: "", // Firmen-Standort: de/at/int
   cpaMin: "",        // CPA-$-Filter ab
   cpaMax: "",        // CPA-$-Filter bis
+  bewMin: "",        // Bewertung ab X (0-10)
+  bewOnly: "",       // nur bewertete Einträge
 };
 let currentRecord = null;
 
@@ -65,6 +67,8 @@ function buildFilterParams() {
   if (state.revMax !== null && state.revMax !== "") p.append("revshare_wert", `lte.${state.revMax}`);
   if (state.cpaMin !== null && state.cpaMin !== "") p.append("cpa_wert", `gte.${state.cpaMin}`);
   if (state.cpaMax !== null && state.cpaMax !== "") p.append("cpa_wert", `lte.${state.cpaMax}`);
+  if (state.bewMin !== null && state.bewMin !== "") p.append("bewertung_gesamt", `gte.${state.bewMin}`);
+  if (state.bewOnly === "ja") p.append("bewertung_gesamt", "not.is.null");
 
   // Kombinierte DE/AT-Verfügbarkeit
   if (state.dach === "und") { p.append("verfuegbar_de", "eq.Ja"); p.append("verfuegbar_at", "eq.Ja"); }
@@ -181,11 +185,29 @@ function statusBadge(v) {
   if (v === "In Arbeit") return '<span class="badge status-arbeit">In Arbeit</span>';
   return '<span class="badge neutral">Offen</span>';
 }
+// Farbe von dunkelrot (0) über gelb (5) nach grün (10)
+function bewFarbe(note) {
+  const t = Math.max(0, Math.min(10, note)) / 10;
+  const h = Math.round(t * 120);            // 0=rot, 120=grün
+  const l = 32 + Math.round(t * 12);        // dunkler bei niedrig
+  return `hsl(${h} 70% ${l}%)`;
+}
+function bewBalken(note, kommentare, kompakt) {
+  if (note == null) {
+    return `<span class="bew-none" title="${kommentare ? kommentare + " Kommentare, aber kein klares Bewertungssignal" : "Zu wenige Kommentare"}">–${kommentare ? ` (${kommentare}💬)` : ""}</span>`;
+  }
+  const farbe = bewFarbe(note);
+  const breite = Math.round((note / 10) * 100);
+  return `<span class="bew-wrap" title="Community-Bewertung ${note}/10 aus ${kommentare || "?"} Kommentaren">
+    <span class="bew-bar"><span class="bew-fill" style="width:${breite}%;background:${farbe}"></span></span>
+    <span class="bew-num" style="color:${farbe}">${note.toFixed(1)}</span>${kompakt ? "" : `<span class="bew-cnt">${kommentare || 0}💬</span>`}
+  </span>`;
+}
 
 function renderRows(rows) {
   const tbody = $("#tbody");
   if (!rows.length) {
-    tbody.innerHTML = '<tr><td colspan="13" style="text-align:center;color:var(--text-dim);padding:30px">Keine Treffer.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="14" style="text-align:center;color:var(--text-dim);padding:30px">Keine Treffer.</td></tr>';
     return;
   }
   tbody.innerHTML = rows
@@ -205,6 +227,7 @@ function renderRows(rows) {
         <td>${yesNoBadge(r.affiliate)}</td>
         <td>${r.revshare_wert != null ? `<span class="badge score-high">${r.revshare_wert}%</span>` : r.affiliate === "Ja" ? '<span class="badge neutral" title="Affiliate vorhanden, Satz verhandelbar">verh.</span>' : '<span style="color:var(--text-dim)">–</span>'}</td>
         <td>${r.cpa_wert != null ? `<span class="badge score-high">$${r.cpa_wert}</span>` : r.cpa === "Ja" ? '<span class="badge yes">Ja</span>' : '<span style="color:var(--text-dim)">–</span>'}</td>
+        <td class="bew-cell">${bewBalken(r.bewertung_gesamt, r.bewertung_kommentare)}</td>
         <td>${r.views != null ? r.views.toLocaleString("de-AT") : "–"}</td>
         <td><a class="thread-link" href="${esc(r.thread_url)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">Öffnen ↗</a></td>
       </tr>`
@@ -430,14 +453,30 @@ function openDrawer(record) {
   const tracker = record.tracker || {};
   const eigenschaften = Array.isArray(record.eigenschaften) ? record.eigenschaften : [];
 
-  const info = `
+  const kommentarLink = `${record.thread_url.replace(/\.0$/, "")}.${Math.floor((record.replies || 0) / 20) * 20}`;
+  const bewInfo = `
+    <div class="d-section">
+      <h3>Community-Bewertung (aus den Kommentaren)</h3>
+      ${record.bewertung_gesamt != null || record.bewertung_kommentare
+        ? `<div class="bew-detail">
+            <div class="bew-row"><span class="bew-lbl">Gesamt</span>${bewBalken(record.bewertung_gesamt, record.bewertung_kommentare, true)}</div>
+            ${record.kyc === "Non-KYC"
+              ? '<div class="bew-row"><span class="bew-lbl">KYC-Qualität</span><span class="bew-none">entfällt (Non-KYC)</span></div>'
+              : `<div class="bew-row"><span class="bew-lbl">KYC-Qualität</span>${bewBalken(record.bewertung_kyc, null, true)}</div>`}
+            <div class="bew-row"><span class="bew-lbl">Auszahlungen</span>${bewBalken(record.bewertung_auszahlung, null, true)}</div>
+            <div class="bew-hinweis">💸 ${esc(record.auszahlung_problem_ab || "–")}</div>
+            <div class="bew-hinweis">💬 ${record.bewertung_kommentare || 0} Kommentare ausgewertet · <a href="${esc(kommentarLink)}" target="_blank" rel="noopener">Kommentare im Thread ansehen ↗</a></div>
+          </div>`
+        : `<div class="bew-hinweis">Noch nicht bewertet. <a href="${esc(kommentarLink)}" target="_blank" rel="noopener">Kommentare im Thread ansehen ↗</a></div>`}
+    </div>
     <div class="d-section">
       <h3>Recherche-Fortschritt</h3>
       <div class="progress-wrap">
         <div class="progress-bar"><div class="progress-fill" id="prog-fill" style="width:${prog.pct}%"></div></div>
         <div class="progress-text" id="prog-text">${prog.filled} von ${prog.total} Kategorien ausgefüllt (${prog.pct} %)</div>
       </div>
-    </div>
+    </div>`;
+  const info = `${bewInfo}
     <div class="d-section">
       <h3>Account-Tracker</h3>
       <div class="tracker-list">
@@ -944,6 +983,18 @@ $("#f-standort")?.addEventListener("change", (e) => {
   loadPage();
 });
 
+$("#f-bew-min")?.addEventListener("change", (e) => {
+  state.bewMin = e.target.value;
+  state.page = 0;
+  loadPage();
+});
+
+$("#f-bew-only")?.addEventListener("change", (e) => {
+  state.bewOnly = e.target.value;
+  state.page = 0;
+  loadPage();
+});
+
 let revTimer;
 const BEREICHS_FILTER = { "f-rev-min": "revMin", "f-rev-max": "revMax", "f-cpa-min": "cpaMin", "f-cpa-max": "cpaMax" };
 Object.entries(BEREICHS_FILTER).forEach(([id, key]) => {
@@ -971,6 +1022,8 @@ $("#reset")?.addEventListener("click", () => {
   state.standortFilter = "";
   state.cpaMin = "";
   state.cpaMax = "";
+  state.bewMin = "";
+  state.bewOnly = "";
   resetAdvFilters();
   $("#search").value = "";
   $("#wunsch").value = "";
@@ -982,6 +1035,8 @@ $("#reset")?.addEventListener("click", () => {
   $("#f-meine").value = "";
   $("#f-dach").value = "";
   $("#f-standort").value = "";
+  $("#f-bew-min").value = "";
+  $("#f-bew-only").value = "";
   renderChips([]);
   document.querySelectorAll("#filters select[data-col]").forEach((s) => (s.value = ""));
   $("#sort").value = "bekanntheits_score.desc.nullslast";
@@ -1014,7 +1069,10 @@ const EXPORT_SPALTEN = [
   ["kette", "Kette"], ["kette_firma", "Firma"], ["kette_partner", "Verbundene Seiten"],
   ["affiliate", "Affiliate"], ["cpa", "CPA"], ["cpa_hoehe", "CPA-Höhe"], ["cpa_wert", "CPA-Betrag ($)"], ["revshare_prozent", "Revshare"], ["revshare_wert", "Revshare (%)"],
   ["affiliate_kontakt", "Affiliate-Kontakt"], ["spieler_zahlen", "Spielerzahlen"],
-  ["kunden_bewertungen", "Bewertungen"], ["views", "Aufrufe"], ["thread_url", "Bitcointalk-Link"],
+  ["kunden_bewertungen", "Bewertungen"],
+  ["bewertung_gesamt", "Community-Note (0-10)"], ["bewertung_kyc", "KYC-Note"], ["bewertung_auszahlung", "Auszahlungs-Note"],
+  ["auszahlung_problem_ab", "Auszahlungsprobleme ab"], ["bewertung_kommentare", "Ausgewertete Kommentare"],
+  ["views", "Aufrufe"], ["thread_url", "Bitcointalk-Link"],
 ];
 
 async function exportRowsFetch(maxRows = 12000) {

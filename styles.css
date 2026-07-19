@@ -302,6 +302,20 @@ td .website { color: var(--accent); font-weight: 600; }
 /* Nummer-Spalte + Ketten-Vorschau in der Zeile */
 .nr-cell { color: var(--accent); font-weight: 700; font-size: 0.82rem; white-space: nowrap; }
 .dach-cell { white-space: nowrap; }
+
+/* Community-Bewertung */
+.bew-cell { min-width: 120px; }
+.bew-wrap { display: inline-flex; align-items: center; gap: 6px; }
+.bew-bar { display: inline-block; width: 54px; height: 8px; background: var(--bg); border: 1px solid var(--border); border-radius: 5px; overflow: hidden; }
+.bew-fill { display: block; height: 100%; border-radius: 5px; }
+.bew-num { font-weight: 700; font-size: 0.82rem; }
+.bew-cnt { color: var(--text-dim); font-size: 0.72rem; }
+.bew-none { color: var(--text-dim); font-size: 0.8rem; }
+.bew-detail { display: flex; flex-direction: column; gap: 8px; }
+.bew-row { display: flex; align-items: center; gap: 10px; }
+.bew-lbl { width: 110px; color: var(--text-dim); font-size: 0.85rem; flex-shrink: 0; }
+.bew-row .bew-bar { width: 120px; height: 11px; }
+.bew-hinweis { color: var(--text-dim); font-size: 0.82rem; margin-top: 4px; }
 .t-title { max-width: 420px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .t-kette {
   margin-top: 3px;
