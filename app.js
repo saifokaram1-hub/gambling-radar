@@ -192,9 +192,17 @@ function bewFarbe(note) {
   const l = 32 + Math.round(t * 12);        // dunkler bei niedrig
   return `hsl(${h} 70% ${l}%)`;
 }
-function bewBalken(note, kommentare, kompakt) {
+function bewBalken(note, kommentare, kompakt, geprueft) {
   if (note == null) {
-    return `<span class="bew-none" title="${kommentare ? kommentare + " Kommentare, aber kein klares Bewertungssignal" : "Zu wenige Kommentare"}">–${kommentare ? ` (${kommentare}💬)` : ""}</span>`;
+    // Noch nicht geprüft -> grau (neutral). Geprüft, aber keine Bewertung -> ROT (Warnung).
+    if (!geprueft) {
+      return `<span class="bew-none" title="Kommentare werden gerade ausgewertet …">⏳ wird geprüft</span>`;
+    }
+    const rot = bewFarbe(0);
+    return `<span class="bew-wrap" title="Geprüft: ${kommentare ? kommentare + " Kommentare, aber keine verwertbare Bewertung/keine klaren Erfahrungsberichte" : "Zu wenige Kommentare für eine Bewertung"}">
+      <span class="bew-bar"><span class="bew-fill" style="width:100%;background:${rot}"></span></span>
+      <span class="bew-num" style="color:${rot}">k.B.</span>${kompakt ? "" : `<span class="bew-cnt">${kommentare || 0}💬</span>`}
+    </span>`;
   }
   const farbe = bewFarbe(note);
   const breite = Math.round((note / 10) * 100);
@@ -227,7 +235,7 @@ function renderRows(rows) {
         <td>${yesNoBadge(r.affiliate)}</td>
         <td>${r.revshare_wert != null ? `<span class="badge score-high">${r.revshare_wert}%</span>` : r.affiliate === "Ja" ? '<span class="badge neutral" title="Affiliate vorhanden, Satz verhandelbar">verh.</span>' : '<span style="color:var(--text-dim)">–</span>'}</td>
         <td>${r.cpa_wert != null ? `<span class="badge score-high">$${r.cpa_wert}</span>` : r.cpa === "Ja" ? '<span class="badge yes">Ja</span>' : '<span style="color:var(--text-dim)">–</span>'}</td>
-        <td class="bew-cell">${bewBalken(r.bewertung_gesamt, r.bewertung_kommentare)}</td>
+        <td class="bew-cell">${bewBalken(r.bewertung_gesamt, r.bewertung_kommentare, false, r.bewertung_am != null)}</td>
         <td>${r.views != null ? r.views.toLocaleString("de-AT") : "–"}</td>
         <td><a class="thread-link" href="${esc(r.thread_url)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">Öffnen ↗</a></td>
       </tr>`
@@ -457,17 +465,17 @@ function openDrawer(record) {
   const bewInfo = `
     <div class="d-section">
       <h3>Community-Bewertung (aus den Kommentaren)</h3>
-      ${record.bewertung_gesamt != null || record.bewertung_kommentare
+      ${record.bewertung_am != null
         ? `<div class="bew-detail">
-            <div class="bew-row"><span class="bew-lbl">Gesamt</span>${bewBalken(record.bewertung_gesamt, record.bewertung_kommentare, true)}</div>
+            <div class="bew-row"><span class="bew-lbl">Gesamt</span>${bewBalken(record.bewertung_gesamt, record.bewertung_kommentare, true, true)}</div>
             ${record.kyc === "Non-KYC"
               ? '<div class="bew-row"><span class="bew-lbl">KYC-Qualität</span><span class="bew-none">entfällt (Non-KYC)</span></div>'
-              : `<div class="bew-row"><span class="bew-lbl">KYC-Qualität</span>${bewBalken(record.bewertung_kyc, null, true)}</div>`}
-            <div class="bew-row"><span class="bew-lbl">Auszahlungen</span>${bewBalken(record.bewertung_auszahlung, null, true)}</div>
+              : `<div class="bew-row"><span class="bew-lbl">KYC-Qualität</span>${bewBalken(record.bewertung_kyc, null, true, true)}</div>`}
+            <div class="bew-row"><span class="bew-lbl">Auszahlungen</span>${bewBalken(record.bewertung_auszahlung, null, true, true)}</div>
             <div class="bew-hinweis">💸 ${esc(record.auszahlung_problem_ab || "–")}</div>
             <div class="bew-hinweis">💬 ${record.bewertung_kommentare || 0} Kommentare ausgewertet · <a href="${esc(kommentarLink)}" target="_blank" rel="noopener">Kommentare im Thread ansehen ↗</a></div>
           </div>`
-        : `<div class="bew-hinweis">Noch nicht bewertet. <a href="${esc(kommentarLink)}" target="_blank" rel="noopener">Kommentare im Thread ansehen ↗</a></div>`}
+        : `<div class="bew-hinweis">⏳ Kommentare werden gerade ausgewertet – die Bewertung erscheint in Kürze. <a href="${esc(kommentarLink)}" target="_blank" rel="noopener">Kommentare im Thread ansehen ↗</a></div>`}
     </div>
     <div class="d-section">
       <h3>Recherche-Fortschritt</h3>

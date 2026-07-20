@@ -109,8 +109,9 @@ function postsAusHtml(html, opUeberspringen) {
 /* ---------- Hauptschleife ---------- */
 async function holeOffene() {
   const rows = [];
+  // Meistgesehene zuerst – damit die bekanntesten Casinos zuerst eine Bewertung bekommen
   for (let off = 0; ; off += 1000) {
-    const res = await fetch(`${SUPA}?select=topic_id,title,thread_url,replies,kyc&replies=gte.5&bewertung_am=is.null&order=topic_id.asc&limit=1000&offset=${off}`, { headers: { apikey: KEY } });
+    const res = await fetch(`${SUPA}?select=topic_id,nummer,title,thread_url,replies,kyc&replies=gte.5&bewertung_am=is.null&order=views.desc.nullslast&limit=1000&offset=${off}`, { headers: { apikey: KEY } });
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const b = await res.json();
     rows.push(...b);
@@ -153,7 +154,7 @@ async function upsert(batch) {
     if (posts.length) {
       const s = scorePosts(posts, row.kyc === 'KYC');
       buffer.push({
-        topic_id: row.topic_id, title: row.title, thread_url: row.thread_url,
+        topic_id: row.topic_id, nummer: row.nummer, title: row.title, thread_url: row.thread_url,
         bewertung_gesamt: s.gesamt, bewertung_kyc: s.kycNote, bewertung_auszahlung: s.payNote,
         auszahlung_problem_ab: s.problemAb, bewertung_kommentare: posts.length,
         bewertung_am: new Date().toISOString(),
