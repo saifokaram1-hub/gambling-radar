@@ -60,9 +60,100 @@ async function chatExamples(params, sort, n = 5) {
   return res.ok ? res.json() : [];
 }
 
+/* ---------- Wissensbasis: der Agent erklärt die App ---------- */
+const HILFE = [
+  [/download|herunter|runterlad|runterzieh|excel|pdf|export|datei|speicher.* ab/, `<b>⬇ Herunterladen:</b> Über der Tabelle gibt es <b>⬇ Excel</b> und <b>⬇ PDF</b> – die laden immer genau das herunter, was gerade gefiltert ist.<br>Einzelne Ordner lädst du unter <b>Mein Bereich → 📁 Ordner → ⬇ Download</b>.<br>Im Download-Fenster wählst du den Umfang: <b>Kompakt</b> (kleine Datei), <b>Mit Bewertungen &amp; Fazits</b> oder <b>Alles</b> (alle Felder).`],
+  [/ordner|sammlung|mappe/, `<b>📁 Ordner:</b> Klick bei einem Eintrag auf <b>📁</b> (in der Tabelle oder im Detail-Fenster). Dort wählst du einen Ordner oder legst unten direkt einen neuen an – der Eintrag wird automatisch mitgespeichert.<br>Deine Ordner findest du unter <b>Mein Bereich → 📁 Ordner</b>. Dort hat jeder Ordner einen <b>⬇ Download</b>-Knopf.<br><br>💡 Ich kann das auch für dich machen – sag z.B.: <i>„Sammle alle Non-KYC mit Sportwetten in Ordner Favoriten"</i>.`],
+  [/bewertung|note|balken|k\.b\.|farbe/, `<b>⭐ Bewertung (0–10):</b> Ich lese die neuesten Kommentare jedes Threads und errechne daraus eine Note – <b>grün = gut, rot = schlecht</b>.<br>Es gibt drei Noten: <b>Gesamt</b>, <b>KYC-Qualität</b> und <b>Auszahlungen</b> (im Detail-Fenster).<br><b>k.B.</b> = geprüft, aber keine verwertbaren Erfahrungsberichte gefunden. <b>⏳ wird geprüft</b> = Analyse läuft noch.<br>Mit dem Filter <b>Bewertung ab</b> zeigst du nur Anbieter ab einer Mindestnote.`],
+  [/kyc/, `<b>🔐 KYC:</b> <b>Non-KYC</b> = keine Verifizierung nötig (${"668"} Anbieter), <b>KYC</b> = Ausweis/Selfie nötig.<br>Im Detail-Fenster steht das <b>KYC-Fazit</b> aus den Kommentaren: ab welchem Betrag verifiziert wird und wie mühsam es ist.<br>Tipp: Tippe einfach <b>non-kyc</b> in die Schnellsuche – das setzt direkt den Filter.`],
+  [/verfügbar|deutschland|österreich|de\/at|geoblock/, `<b>🌍 Verfügbarkeit:</b> <b>Ja</b> = Website ist erreichbar (aktuell 3.941 in DE, 3.943 in AT), <b>Nein</b> = Seite ist tot, <b>Unbekannt</b> = ich konnte keine Website finden.<br>Mit dem Filter <b>Verfügbar DE/AT</b> kombinierst du: „DE oder AT", „DE und AT", nur eines davon.<br><b>Standort</b> ist etwas anderes: wo die Firma sitzt (fast alle in Curaçao – nur 3 in Deutschland).`],
+  [/filter|suchen|suche|finden/, `<b>🔍 Suchen &amp; Filtern:</b><br>• <b>Wunsch-Suche</b> (oben): frei formulieren, z.B. <i>„Non-KYC mit Sportwetten für Österreich"</i> – auch per 🎤 Sprache.<br>• <b>Schnellsuche</b>: Name, Website oder eine <b>Nummer</b> (z.B. „100" zeigt Eintrag #100). Wörter wie <b>kyc</b>, <b>cpa</b>, <b>affiliate</b> setzen direkt den Filter.<br>• <b>Filterleiste</b>: KYC, Sportwetten, DE/AT, Revshare/CPA von–bis, Bewertung ab u.v.m.<br>• <b>Erweiterte Filter</b>: jede Kategorie einzeln durchsuchen.`],
+  [/nummer|nr\.|#/, `<b>#️⃣ Nummern:</b> Jeder der 11.886 Anbieter hat eine feste Nummer (1 = bekanntester). Tippe die Zahl in eine Suchleiste oder frag mich <i>„Zeig Nr. 500"</i>.`],
+  [/kette|schwester|verbund/, `<b>🔗 Ketten:</b> Gehört ein Anbieter zu einer Firmengruppe, steht direkt unter dem Namen „Verbunden mit …". Im Detail-Fenster siehst du alle Schwesterseiten zum Anklicken. Filter: <b>Kette = Ja</b>.`],
+  [/affiliate|cpa|revshare|provision/, `<b>💼 Affiliate:</b> 858 Anbieter haben ein Partnerprogramm, 821 davon mit Kontaktdaten (im Detail-Fenster).<br><b>Revshare</b> und <b>CPA</b> kannst du als Bereich filtern (ab/bis). Achtung: Nur wenige nennen ihre Sätze öffentlich – die meisten verhandeln individuell (steht dann „verh.").`],
+  [/kommentar/, `<b>💬 Kommentare:</b> Ich werte die <b>neuesten ~40 Kommentare</b> je Anbieter aus (nicht alle – manche Threads haben über 30.000). Daraus entstehen die Noten und die drei Fazits: <b>Anbieter allgemein</b>, <b>KYC</b> und <b>Auszahlungen</b>.<br>Die ausgewertete Anzahl und ein Link zu den echten Kommentaren stehen in jedem Detail-Fenster.`],
+  [/passwort|zugang|login|account/, `<b>🔒 Zugang:</b> Die Seite ist mit dem gemeinsamen Code geschützt (Groß-/Kleinschreibung egal). Danach bekommt jedes Gerät automatisch einen persönlichen Bereich – ohne Anmeldung. Deine Likes, Ordner und Notizen bleiben dort gespeichert.`],
+];
+
+function findeErklaerung(lower) {
+  if (!/\b(wie|was|wo|warum|erklär|erkläre|hilfe|help|bedeutet|kann ich|funktioniert|geht das)\b/.test(lower)) return null;
+  for (const [muster, antwort] of HILFE) if (muster.test(lower)) return antwort;
+  return null;
+}
+
+/* ---------- Agent-Aktion: Treffer sammeln und in einen Ordner legen ---------- */
+async function agentInOrdner(text, lower) {
+  if (typeof meinUser === "undefined" || !meinUser) { chatAdd("bot", "Dafür brauche ich deinen persönlichen Bereich – lade die Seite einmal neu."); return true; }
+
+  // Ordnername: aus Anführungszeichen, nach „ordner/namens/nenne" oder Standardname
+  let name = null;
+  const mQuote = text.match(/[„"'»]([^"'«»]{2,40})[""'«]/);
+  const mNach = text.match(/ordner(?:\s+(?:namens|mit dem namen|genannt))?\s+([A-Za-zÄÖÜäöüß0-9 _-]{2,40})/i);
+  if (mQuote) name = mQuote[1].trim();
+  else if (mNach) name = mNach[1].trim().replace(/\s+(rein|hinein|packen|legen|tun|speichern|stecken).*$/i, "").trim();
+  if (!name || name.length < 2) name = "Agent-Auswahl";
+
+  // Filter aus dem Rest der Frage
+  let rest = text.replace(/[„"'»][^"'«»]*[""'«]/g, " ").replace(/\b(sammle|sammel|leg|lege|packe|tu|tue|stecke|speichere|erstelle|mache|mach)\b/gi, " ")
+    .replace(/\bin (einen |den |einem )?ordner\b/gi, " ").replace(/\bordner\b/gi, " ");
+  // WICHTIG: den Ordnernamen aus den Suchkriterien entfernen, sonst filtert er mit
+  if (name) rest = rest.replace(new RegExp(name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "ig"), " ");
+  let parsed = null;
+  try { parsed = parseWunsch(rest); } catch { parsed = null; }
+  if (!parsed || !parsed.chips.length) {
+    chatAdd("bot", "Ich habe die Kriterien nicht erkannt. Sag es z.B. so:<br><i>Sammle alle Non-KYC mit Sportwetten in Ordner Favoriten</i>");
+    return true;
+  }
+
+  const params = chatBuildParams(parsed);
+  const anzahl = await chatCount(params);
+  if (!anzahl) { chatAdd("bot", `Zu <b>${parsed.chips.join(" · ")}</b> gibt es keine Treffer – nichts zu sammeln.`); return true; }
+  const MAXX = 300;
+  const holen = Math.min(anzahl, MAXX);
+  const q = new URLSearchParams(params);
+  q.append("select", "id,nummer,title,website,bekanntheits_score");
+  q.append("order", parsed.sort || "bekanntheits_score.desc.nullslast");
+  q.append("limit", holen);
+  const res = await fetch(`${API}?${q}`, { headers: HEADERS });
+  const rows = await res.json();
+
+  // Ordner anlegen oder vorhandenen nutzen
+  let ordner = myFolders.find((f) => f.name.toLowerCase() === name.toLowerCase());
+  if (!ordner) {
+    const ins = await fetch(ORDNER_API, { method: "POST", headers: { ...HEADERS, Prefer: "return=representation" }, body: JSON.stringify({ user_id: meinUser.id, name }) });
+    if (!ins.ok) { chatAdd("bot", "Der Ordner konnte nicht angelegt werden."); return true; }
+    ordner = (await ins.json())[0];
+    myFolders.push(ordner);
+  }
+
+  // Zuweisen (Bulk) + als gespeichert markieren
+  const zuweisungen = rows.map((r) => ({ ordner_id: ordner.id, casino_id: r.id }));
+  const zRes = await fetch(ORDNER_ITEMS_API, { method: "POST", headers: { ...HEADERS, Prefer: "resolution=ignore-duplicates,return=minimal" }, body: JSON.stringify(zuweisungen) });
+  if (!folderItems.has(ordner.id)) folderItems.set(ordner.id, new Set());
+  rows.forEach((r) => folderItems.get(ordner.id).add(r.id));
+  const items = rows.map((r) => ({ user_id: meinUser.id, casino_id: r.id, gespeichert: true, liked: myItems.get(r.id)?.liked || false, notiz: myItems.get(r.id)?.notiz || null, updated_at: new Date().toISOString() }));
+  await fetch(`${ITEMS_API}?on_conflict=user_id,casino_id`, { method: "POST", headers: { ...HEADERS, Prefer: "resolution=merge-duplicates,return=minimal" }, body: JSON.stringify(items) });
+  rows.forEach((r) => myItems.set(r.id, { ...(myItems.get(r.id) || {}), casino_id: r.id, gespeichert: true }));
+
+  fuelleMeineAuswahlFilter();
+  loadPage();
+  chatAdd("bot", `✅ Erledigt! Ich habe <b>${rows.length}</b> Anbieter für <b>${parsed.chips.join(" · ")}</b> in den Ordner <b>📁 ${esc(ordner.name)}</b> gelegt${anzahl > MAXX ? ` (von ${anzahl} Treffern die Top ${MAXX})` : ""}.<br>` +
+    `Du findest sie unter <b>Mein Bereich → 📁 Ordner</b> – dort kannst du sie mit <b>⬇ Download</b> als Excel oder PDF laden.<br>Die bekanntesten davon:<br>` +
+    rows.slice(0, 4).map(chatEntryHtml).join("<br>"));
+  return true;
+}
+
 async function chatAnswer(frage) {
   const text = frage.trim();
   const lower = text.toLowerCase();
+
+  // 0a) Agent-Aktion: in Ordner sammeln
+  if (/\bordner\b/.test(lower) && /\b(sammle|sammel|leg|lege|packe|tu|tue|stecke|speicher|speichere|erstelle|mach|mache|schieb)\b/.test(lower)) {
+    return agentInOrdner(text, lower);
+  }
+  // 0b) App-Erklärungen
+  const erklaerung = findeErklaerung(lower);
+  if (erklaerung) return chatAdd("bot", erklaerung);
 
   // 1) Nummer-Lookup: "nr 5", "nummer 100", "zeig 38", oder reine Zahl
   const nrM = text.match(/(?:nr\.?|nummer|eintrag|#)\s*(\d{1,6})/i) || text.match(/^\s*(\d{1,6})\s*$/);
@@ -82,14 +173,15 @@ async function chatAnswer(frage) {
   }
 
   // 2) Hilfe
-  if (/^(hilfe|help|was kannst du|hallo|hi|hey)\b/.test(lower)) {
-    return chatAdd("bot", "Ich durchsuche alle 11.886 Casinos für dich. Frag mich z.B.:" +
+  if (/^(hilfe|help|was kannst du|hallo|hi|hey|moin)\b/.test(lower)) {
+    return chatAdd("bot", "Ich bin dein Recherche-Agent. Ich kann <b>suchen</b>, <b>Ordner für dich füllen</b> und die <b>App erklären</b>:" +
       `<div class="chat-suggestions">
-        <span class="chat-sugg">Wie viele Non-KYC mit Sportwetten?</span>
-        <span class="chat-sugg">Zeig Nr. 1</span>
-        <span class="chat-sugg">Casinos mit Revshare ab 30%</span>
-        <span class="chat-sugg">Welche gehören zu einer Kette?</span>
+        <span class="chat-sugg">Sammle Non-KYC mit Sportwetten in Ordner Top-Liste</span>
+        <span class="chat-sugg">Wie funktionieren die Ordner?</span>
+        <span class="chat-sugg">Wie lade ich einen Ordner herunter?</span>
+        <span class="chat-sugg">Was bedeutet k.B. bei der Bewertung?</span>
         <span class="chat-sugg">Non-KYC in Österreich verfügbar</span>
+        <span class="chat-sugg">Casinos mit Revshare ab 30%</span>
       </div>`);
   }
 
@@ -173,12 +265,16 @@ function openChat() {
   $("#chat-backdrop").hidden = false;
   if (!chatBegruesst) {
     chatBegruesst = true;
-    chatAdd("bot", "👋 Hi! Ich bin dein Recherche-Chat und kenne alle <b>11.886</b> Casinos. Frag mich etwas:" +
+    chatAdd("bot", "👋 Hi! Ich bin dein <b>Recherche-Agent</b> und kenne alle <b>11.886</b> Anbieter. Ich kann drei Dinge:<br>" +
+      "🔎 <b>Suchen</b> – frag mich nach beliebigen Kriterien<br>" +
+      "📁 <b>Handeln</b> – ich sammle Treffer für dich in einen Ordner<br>" +
+      "💡 <b>Erklären</b> – ich zeige dir, wie die App funktioniert" +
       `<div class="chat-suggestions">
+        <span class="chat-sugg">Sammle alle Non-KYC mit Sportwetten in Ordner Favoriten</span>
+        <span class="chat-sugg">Wie lade ich einen Ordner herunter?</span>
         <span class="chat-sugg">Wie viele Non-KYC mit Sportwetten?</span>
+        <span class="chat-sugg">Was bedeutet die Bewertung?</span>
         <span class="chat-sugg">Zeig Nr. 1</span>
-        <span class="chat-sugg">Revshare ab 30%</span>
-        <span class="chat-sugg">Welche gehören zu einer Kette?</span>
       </div>`);
   }
   $("#chat-input").focus();
