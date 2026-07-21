@@ -359,6 +359,7 @@ const ADV_FIELDS = [
   ["spieler_zahlen", "Spieler-Zahlen"],
   ["kyc_details", "KYC-Details"],
   ["zahlungsmoeglichkeiten", "Einzahlungen (Crypto)"],
+  ["zahlungsmethoden_komm", "Zahlungsmittel laut Kommentaren"],
   ["allgemeines_angebot", "Allgemeines Angebot"],
   ["sportwetten_bericht", "Sportwetten-Bericht"],
   ["registrierung_aufwand", "Registrierungs-Aufwand"],
@@ -650,7 +651,11 @@ const STOP_WORDS = new Set([
 
 // Angebots- und Krypto-Begriffe: suchen in Angebot/Zahlungen UND im Titel
 const OFFER_TERMS = ["poker", "dice", "würfel", "slots", "slot", "crash", "roulette", "blackjack", "baccarat", "lotterie", "lottery", "lotto", "plinko", "mines", "keno", "bingo", "esport", "esports"];
-const CRYPTO_TERMS = { btc: "btc", bitcoin: "bitcoin", eth: "eth", ethereum: "ethereum", usdt: "usdt", tether: "usdt", ltc: "ltc", litecoin: "ltc", doge: "doge", dogecoin: "doge", sol: "sol", solana: "sol", trx: "trx", tron: "trx", xrp: "xrp", monero: "monero", xmr: "xmr" };
+// Klarnamen IMMER auf das Kürzel abbilden – in den Kommentar-Daten stehen Symbole (BTC, ETH …)
+const CRYPTO_TERMS = { btc: "btc", bitcoin: "btc", eth: "eth", ethereum: "eth", usdt: "usdt", tether: "usdt",
+  usdc: "usdc", ltc: "ltc", litecoin: "ltc", doge: "doge", dogecoin: "doge", sol: "sol", solana: "sol",
+  trx: "trx", tron: "trx", xrp: "xrp", ripple: "xrp", monero: "xmr", xmr: "xmr", bnb: "bnb", bch: "bch",
+  dash: "dash", ton: "ton", shib: "shib", matic: "matic", avax: "avax" };
 const TITLE_TERMS = ["bonus", "freispiele", "freespins", "cashback", "rakeback", "vip", "jackpot", "faucet", "provably", "wager"];
 
 function parseWunsch(raw) {
@@ -805,7 +810,7 @@ function parseWunsch(raw) {
     if (offer) { out.groups.push(orGroup(offer === "würfel" ? "dice" : offer, ["allgemeines_angebot", "title"])); out.chips.push(`Angebot: ${offer}`); return mark(); }
 
     // Kryptowährungen
-    if (CRYPTO_TERMS[tok]) { out.groups.push(orGroup(CRYPTO_TERMS[tok], ["zahlungsmoeglichkeiten", "title"])); out.chips.push(`Zahlung: ${tok.toUpperCase()}`); return mark(); }
+    if (CRYPTO_TERMS[tok]) { out.groups.push(orGroup(CRYPTO_TERMS[tok], ["zahlungsmoeglichkeiten", "zahlungsmethoden_komm", "title"])); out.chips.push(`Zahlung: ${tok.toUpperCase()}`); return mark(); }
 
     // Titel-Begriffe (Bonus etc.)
     const tt = TITLE_TERMS.find((t) => tok.startsWith(t));
